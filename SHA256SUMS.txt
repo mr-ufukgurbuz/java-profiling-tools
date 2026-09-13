@@ -16,6 +16,7 @@ d5d807541d23ea0180a645ab0f1337e05ec9dcddd0726b1c6f2a8acf99db779b  jdk/OpenJDK21U
 dc0eaf2bbf0036a70b60798c785d6e03a9daf06b68b8edb0f1ba9eb3421baeb3  jmh/lib/jmh-core-1.37.jar
 6a5604b5b804e0daca1145df1077609321687734a8b49387e49f10557c186c77  jmh/lib/jmh-generator-annprocess-1.37.jar
 df26cc58f235f477db07f753ba5a3ab243ebe5789d9f89ecf68dd62ea9a66c28  jmh/lib/jopt-simple-5.0.4.jar
+33525688a44c08f676367fd821b2b1bc29f11eb8048cba365519222c978ee70c  plugins/idea/PMDPlugin-2.1.0.zip
 e6aab232a13b6844f488daa5106d1dbfe3ff2b24fa4e792a18bd4d486f704f6e  plugins/idea/spotbugs-idea-1.2.8.zip
 40ab4769979440fa8a0248224dd7dead7c3643fbb5a8db601de64fb5e3f3e6a9  plugins/visualvm/jsyntaxpane-lib.nbm
 50aa92bc69f51f0cf7673b1e8dd5b70fb34508eedfdcb4e8ffbac0969d8dfaf6  plugins/visualvm/org-graalvm-visualvm-modules-buffermonitor.nbm

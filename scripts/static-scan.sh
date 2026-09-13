@@ -11,6 +11,7 @@
 #   SPOTBUGS_RULE_PACKS   directory of rule-pack jars  (default: spotbugs-rule-packs/)
 #   SPOTBUGS_CATEGORIES   category list                (default: PERFORMANCE,CORRECTNESS,MT_CORRECTNESS)
 #   SPOTBUGS_EXCLUDE      exclude filter file; set empty to disable
+#   PMD_RULESET           PMD ruleset file; set empty for PMD's own categories
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh" >/dev/null
 
@@ -21,7 +22,7 @@ while [ $# -gt 0 ]; do
     --security)     CATEGORIES="$CATEGORIES,SECURITY" ;;
     --categories)   CATEGORIES="${2:?--categories needs a list}"; shift ;;
     --no-exclude)   SPOTBUGS_EXCLUDE="" ;;
-    -h|--help)      sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help)      sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*)             echo "unknown option: $1" >&2; exit 1 ;;
     *)              ARGS+=("$1") ;;
   esac
@@ -42,6 +43,11 @@ PACKS="${SPOTBUGS_RULE_PACKS:-$PROFILING_HOME/spotbugs-rule-packs}"
 # Without a filter, EI_EXPOSE_REP alone can account for most of the report.
 # See spotbugs-rule-packs/spotbugs-exclude.xml for what is filtered and why.
 EXCLUDE="${SPOTBUGS_EXCLUDE-$PROFILING_HOME/spotbugs-rule-packs/spotbugs-exclude.xml}"
+
+# The PMD ruleset is shared with the IntelliJ PMD plugin, so the IDE and the
+# command line report the same things. Every rule in it exists in both PMD
+# 7.21.0 (bundled in the plugin) and 7.27.0 (bundled here).
+RULESET="${PMD_RULESET-$PROFILING_HOME/pmd-rulesets/pmd-performance.xml}"
 
 echo "=== SpotBugs (bytecode: $CATEGORIES) ==="
 SBOPTS=()
@@ -66,9 +72,16 @@ fi
   -html -output "$REPORT/spotbugs.html" "$CLASSES" || true
 echo ">> $REPORT/spotbugs.html"
 
-echo "=== PMD (source: performance + design) ==="
+if [ -n "$RULESET" ] && [ -f "$RULESET" ]; then
+  echo "=== PMD (source: $(basename "$RULESET")) ==="
+  PMDRULES="$RULESET"
+else
+  [ -n "$RULESET" ] && echo "!! PMD ruleset not found: $RULESET"
+  echo "=== PMD (source: performance + design) ==="
+  PMDRULES="category/java/performance.xml,category/java/design.xml"
+fi
 "$TOOLS/pmd/bin/pmd" check -d "$SRC" \
-  -R category/java/performance.xml,category/java/design.xml \
+  -R "$PMDRULES" \
   -f html -r "$REPORT/pmd.html" --no-fail-on-violation || true
 echo ">> $REPORT/pmd.html"
 

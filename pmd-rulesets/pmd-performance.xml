@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The PMD ruleset scripts/static-scan.sh runs, and the same file you point the
+  IntelliJ PMD plugin at (Settings -> Other Settings -> PMD -> RuleSets -> +).
+  One file for both, so the IDE and the command line report the same things.
+
+  Every rule referenced here exists in both PMD 7.21.0 (what the IDEA plugin
+  bundles) and PMD 7.27.0 (what this repository ships), so the ruleset behaves
+  the same in either. Whole categories are referenced rather than individual
+  rules: a category reference keeps working when a PMD upgrade adds rules.
+
+  To run WITHOUT it:        PMD_RULESET= ./scripts/static-scan.sh build/classes
+  To use your own instead:  PMD_RULESET=quality/pmd.xml ./scripts/static-scan.sh build/classes
+
+  Ruleset syntax: https://docs.pmd-code.org/latest/pmd_userdocs_making_rulesets.html
+-->
+<ruleset name="java-profiling-tools"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        Performance-oriented PMD rules for the offline profiling toolkit.
+        Source-level bottleneck candidates, to be confirmed with diagnose.sh.
+    </description>
+
+    <!-- All 25 performance rules. This category is identical in 7.21 and 7.27.
+         The ones that actually turn up in profiles: InefficientStringBuffering,
+         ConsecutiveLiteralAppends, AvoidInstantiatingObjectsInLoops,
+         InsufficientStringBufferDeclaration, UseArraysAsList. -->
+    <rule ref="category/java/performance.xml"/>
+
+    <!-- Threading mistakes that show up as lock contention in a profile. -->
+    <rule ref="category/java/multithreading.xml"/>
+
+    <!-- Design rules, minus the ones that bury the report. What is kept is
+         mostly complexity: the numbers that answer "where do I refactor
+         first?" once a profile has told you which class is hot. -->
+    <rule ref="category/java/design.xml">
+        <!-- Fires on nearly every line of ordinary Java. -->
+        <exclude name="LawOfDemeter"/>
+        <!-- Needs per-project configuration to mean anything. -->
+        <exclude name="LoosePackageCoupling"/>
+        <!-- Counting imports/methods/fields says little on its own, and these
+             four together produce most of an unfiltered design report. -->
+        <exclude name="ExcessiveImports"/>
+        <exclude name="TooManyMethods"/>
+        <exclude name="TooManyFields"/>
+        <exclude name="ExcessivePublicCount"/>
+        <!-- Flags every DTO and value object. -->
+        <exclude name="DataClass"/>
+        <!-- Style arguments, not performance ones. -->
+        <exclude name="SignatureDeclareThrowsException"/>
+        <exclude name="AvoidCatchingGenericException"/>
+    </rule>
+
+</ruleset>

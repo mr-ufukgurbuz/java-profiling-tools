@@ -37,9 +37,10 @@ is costing you, and what to do about it.
 - [The GUI tools](#the-gui-tools)
   - [Why JMC would not open, and how that is fixed](#why-jmc-would-not-open-and-how-that-is-fixed)
   - [VisualVM, with its plugins already installed](#visualvm-with-its-plugins-already-installed)
-- [Static analysis: SpotBugs](#static-analysis-spotbugs)
-  - [The rule packs](#the-rule-packs)
-  - [SpotBugs inside IntelliJ IDEA](#spotbugs-inside-intellij-idea)
+- [Static analysis: SpotBugs and PMD](#static-analysis-spotbugs-and-pmd)
+  - [The SpotBugs rule packs](#the-spotbugs-rule-packs)
+  - [The PMD ruleset](#the-pmd-ruleset)
+  - [Both of them inside IntelliJ IDEA](#both-of-them-inside-intellij-idea)
 - [Script reference](#script-reference)
 - [Tool reference](#tool-reference)
 - [Reading the output](#reading-the-output)
@@ -363,31 +364,34 @@ the GUI, either `ssh -X`, or copy the `.jfr` / `.hprof` to your workstation.
 
 ---
 
-## Static analysis: SpotBugs
+## Static analysis: SpotBugs and PMD
 
-A profiler tells you where the time went. SpotBugs tells you *why* the code
-there was likely to be slow — and it does it without running anything, which
-means you can point it at a build on a machine where you cannot attach to the
-JVM at all.
+A profiler tells you where the time went. SpotBugs and PMD tell you *why* the
+code there was likely to be slow — and they do it without running anything,
+which means you can point them at a build on a machine where you cannot attach
+to the JVM at all.
 
-It reads **bytecode**, not source. That is what separates it from an IDE's own
-inspections: it follows data flow across method boundaries, so it finds the null
+They look at different things, which is why both are here. **SpotBugs reads
+bytecode**: it follows data flow across method boundaries, so it finds the null
 path three calls down, the stream that is only closed on the happy path, the
-`synchronized` block guarding the wrong object.
+`synchronized` block guarding the wrong object. **PMD reads source**: it sees
+the `+=` in the loop, the un-presized collection, the complexity number that
+tells you which class to refactor first.
 
 ```bash
 ./scripts/static-scan.sh build/classes src/main/java
 ```
 
-The scan asks for `PERFORMANCE`, `CORRECTNESS` and `MT_CORRECTNESS`, runs at
-`-effort:max`, and writes `spotbugs.html`, `pmd.html` and `cpd.txt` into
-`$PERF_OUT/static-report/`.
+SpotBugs runs at `-effort:max` over `PERFORMANCE`, `CORRECTNESS` and
+`MT_CORRECTNESS`; PMD runs the shared ruleset; CPD looks for copy-paste. The
+three reports land in `$PERF_OUT/static-report/` as `spotbugs.html`, `pmd.html`
+and `cpd.txt`.
 
-These are **candidates, not proof.** SpotBugs flags a `String` concatenation
+These are **candidates, not proof.** Both tools flag a `String` concatenation
 that runs once at startup exactly as loudly as one inside a 400-iteration loop.
 Confirm with `diagnose.sh` before you change anything.
 
-### The rule packs
+### The SpotBugs rule packs
 
 [`spotbugs-rule-packs/`](spotbugs-rule-packs/) holds two SpotBugs plugin jars.
 `static-scan.sh` loads every `.jar` it finds there automatically — there is
@@ -418,34 +422,62 @@ nearly every getter), test classes, and synthetic classes such as the
 `$SwitchMap` holder javac generates for a `switch` over an enum. Without it the
 report runs to thousands of findings and the team stops reading it.
 
-### SpotBugs inside IntelliJ IDEA
+### The PMD ruleset
 
-[`plugins/idea/spotbugs-idea-1.2.8.zip`](plugins/idea/) is the SpotBugs plugin
-for IntelliJ IDEA, bundled so it can be installed with no internet:
-`Settings → Plugins → ⚙ → Install Plugin from Disk…`. It needs IDEA 2022.2 or
-later, Community or Ultimate.
+[`pmd-rulesets/pmd-performance.xml`](pmd-rulesets/pmd-performance.xml) is the
+ruleset `static-scan.sh` hands to PMD, and the same file you point the IntelliJ
+PMD plugin at. One file in both places, so the IDE and the build report the
+same things.
 
-Because it reads bytecode, **build the project before you analyse** — otherwise
-you get findings against stale class files, with line numbers that no longer
-match. Then set `Effort: Max` and `Minimum confidence: Medium` under
-`Settings → Tools → SpotBugs`.
+It takes all 25 `performance` rules, all of `multithreading`, and `design`
+minus the nine that bury a report — `LawOfDemeter` alone fires on nearly every
+line of ordinary Java. It references whole categories rather than individual
+rules, which is what lets it load unchanged on the plugin's PMD 7.21.0 and on
+the 7.27.0 bundled here: 68 rules against 69, zero configuration errors either
+way, same findings.
 
-The plugin bundles its own rule packs, and they are older than the ones in this
-repository (`fb-contrib 7.6.0` vs `sb-contrib 7.6.9`, `findsecbugs 1.12.0` vs
-`1.14.0`). To use the newer jars, add them under
-`Settings → Tools → SpotBugs → Plugins → +` — and **disable the bundled copy of
-each first**, because SpotBugs refuses to load two plugins sharing a plugin id
-and these pairs share theirs.
+```bash
+PMD_RULESET=quality/my-pmd.xml ./scripts/static-scan.sh build/classes src/main/java
+PMD_RULESET= ./scripts/static-scan.sh build/classes   # PMD's own categories
+```
 
-The plugin bundles SpotBugs 4.8.6; `static-scan.sh` uses 4.10.4. Findings are
-close but not identical, and the CLI is the newer analyser.
+### Both of them inside IntelliJ IDEA
 
-> Run SpotBugs in your build and fail on new findings there. The IDE plugin is
-> for the loop while you write code — it is not a quality gate, because it only
-> covers what someone remembered to right-click.
+[`plugins/idea/`](plugins/idea/) holds both plugins, bundled so they install
+with no internet — `Settings → Plugins → ⚙ → Install Plugin from Disk…`:
 
-Full details in [`plugins/idea/README.md`](plugins/idea/README.md) and
-[`spotbugs-rule-packs/README.md`](spotbugs-rule-packs/README.md).
+| Plugin | Needs | Bundled engine | Settings page |
+|---|---|---|---|
+| `spotbugs-idea-1.2.8.zip` | IDEA 2022.2+ | SpotBugs 4.8.6 | `Settings → Tools → SpotBugs` |
+| `PMDPlugin-2.1.0.zip` | IDEA 2024.1+ | PMD 7.21.0 | `Settings → Tools → PMD` |
+
+Because SpotBugs reads bytecode, **build the project before you analyse** —
+otherwise you get findings against stale class files, with line numbers that no
+longer match. Set `Effort: Max` and `Minimum confidence: Medium`.
+
+Two steps make the IDE run the same rules as the build. For PMD, add the shared
+ruleset above. For SpotBugs, add `sb-contrib-7.6.9.jar` and
+`findsecbugs-plugin-1.14.0.jar` under `Plugins → +` — and **disable the older
+copies the plugin bundles**, because SpotBugs refuses to load two plugins
+sharing a plugin id and these pairs share theirs.
+
+Downgrading this repository to the plugin's rule-pack versions instead does not
+work: fb-contrib 7.6.0 predates a BCEL change in SpotBugs 4.10.4 and three of
+its detectors throw on every class rather than reporting. sb-contrib 7.6.9 is
+the release that fixed that.
+
+After those two steps the **rules** match everywhere. The **engines** still
+differ — 4.8.6 vs 4.10.4, 7.21.0 vs 7.27.0 — because each plugin links against
+the analyser it was built with. Where the two disagree, the CLI is the newer
+analyser, so settle it against the build.
+
+> Run both tools in your build and fail on new findings there. The IDE plugins
+> are for the loop while you write code — they are not a quality gate, because
+> they only cover what someone remembered to right-click.
+
+Full details in [`plugins/idea/README.md`](plugins/idea/README.md),
+[`spotbugs-rule-packs/README.md`](spotbugs-rule-packs/README.md) and
+[`pmd-rulesets/README.md`](pmd-rulesets/README.md).
 
 ---
 
@@ -569,11 +601,12 @@ SpotBugs over the bytecode (PERFORMANCE, CORRECTNESS, MT_CORRECTNESS), PMD over
 the source (performance + design), plus copy-paste detection.
 
 The two rule packs in [`spotbugs-rule-packs/`](spotbugs-rule-packs/) are loaded
-automatically, as is the exclude filter next to them; drop more jars in that
-directory and they are picked up too. `--categories LIST` replaces the category
-list outright, and `SPOTBUGS_RULE_PACKS`, `SPOTBUGS_CATEGORIES` and
-`SPOTBUGS_EXCLUDE` override the three defaults from the environment. See
-[Static analysis: SpotBugs](#static-analysis-spotbugs).
+automatically, as is the exclude filter next to them and the PMD ruleset in
+[`pmd-rulesets/`](pmd-rulesets/); drop more jars in that directory and they are
+picked up too. `--categories LIST` replaces the category list outright, and
+`SPOTBUGS_RULE_PACKS`, `SPOTBUGS_CATEGORIES`, `SPOTBUGS_EXCLUDE` and
+`PMD_RULESET` override the defaults from the environment. See
+[Static analysis: SpotBugs and PMD](#static-analysis-spotbugs-and-pmd).
 
 These find **candidates**, not proof. Confirm with a profile before changing
 anything.
@@ -620,6 +653,7 @@ result written to `$PERF_OUT/jmh/result-<timestamp>.json`.
 | **Find Security Bugs** | 1.14.0 | SpotBugs rule pack: 144 SECURITY patterns (`--security`) |
 | **SpotBugs for IDEA** | 1.2.8 | The same analysis inside IntelliJ, installable offline |
 | **PMD / CPD** | 7.27.0 | Source analysis and copy-paste detection |
+| **PMD for IDEA** | 2.1.0 | The same ruleset inside IntelliJ, installable offline |
 | **JaCoCo** | 0.8.15 | Coverage — to know which code is actually exercised |
 | **JMH** | 1.37 | Microbenchmarks that survive JIT trickery |
 | **JOL** | 0.17 | Object memory layout, byte by byte |
@@ -795,8 +829,9 @@ java-profiling-tools/
 ├── compile-time/            SpotBugs, PMD (split), JaCoCo, JOL
 ├── plugins/
 │   ├── visualvm/            21 .nbm modules, installed offline by 00-setup.sh
-│   └── idea/                SpotBugs plugin for IntelliJ IDEA
+│   └── idea/                SpotBugs + PMD plugins for IntelliJ IDEA
 ├── spotbugs-rule-packs/     sb-contrib + findsecbugs, and the exclude filter
+├── pmd-rulesets/            the PMD ruleset shared by the CLI and the IDE
 ├── jmh/                     JMH jars, a runner, and an example benchmark
 ├── docs/                    screenshots, and how they were made
 ├── tools/                   created by 00-setup.sh  (git-ignored)
@@ -838,5 +873,6 @@ sha256sum -c SHA256SUMS.txt
 The scripts and documentation in this repository are released under the terms
 in [`LICENSE`](LICENSE). The bundled third-party tools keep their own licences —
 GPLv2+CE (OpenJDK, VisualVM), EPL (JMC, MAT, JaCoCo), Apache 2.0
-(async-profiler, PMD, JMH, JOL), LGPL (SpotBugs and its IDEA plugin, sb-contrib,
-Find Security Bugs) — and their licence files travel inside their own archives.
+(async-profiler, PMD and its IDEA plugin, JMH, JOL), LGPL (SpotBugs and its IDEA
+plugin, sb-contrib, Find Security Bugs) — and their licence files travel inside
+their own archives.

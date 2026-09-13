@@ -1,59 +1,69 @@
-# `plugins/idea/` — the SpotBugs plugin for IntelliJ IDEA
+# `plugins/idea/` — the IntelliJ IDEA plugins
 
 **[English](README.md) · [Türkçe](README.tr.md)**
 
-`spotbugs-idea-1.2.8.zip` is the [SpotBugs plugin][mp] for IntelliJ IDEA,
-packaged here so it can be installed on a machine with no internet. It is the
-same analysis [`scripts/static-scan.sh`](../../scripts/static-scan.sh) runs,
-moved into the editor: right-click a class, get the findings inline.
+The two static analysers [`scripts/static-scan.sh`](../../scripts/static-scan.sh)
+runs, packaged so they can be installed on a machine with no internet. Same
+analysis, moved into the editor: right-click a class, get the findings inline.
 
-[mp]: https://plugins.jetbrains.com/plugin/14014-spotbugs
+| | [SpotBugs][sb] | [PMD][pmd] |
+|---|---|---|
+| File | `spotbugs-idea-1.2.8.zip` | `PMDPlugin-2.1.0.zip` |
+| Plugin id | `org.jetbrains.plugins.spotbugs` | `PMDPlugin` |
+| Requires | IDEA build `222.1`+ (2022.2 onwards) | IDEA build `241`+ (2024.1 onwards) |
+| Reads | **bytecode** | **source** |
+| Bundled engine | SpotBugs 4.8.6 | PMD 7.21.0 |
+| Settings page | `Settings → Tools → SpotBugs` | `Settings → Tools → PMD` |
 
-| | |
-|---|---|
-| Plugin id | `org.jetbrains.plugins.spotbugs` |
-| Version | 1.2.8 |
-| Requires | IDEA build `222.1` or later — that is 2022.2 onwards, including 2025.2.x |
-| Editions | Community or Ultimate (it needs `com.intellij.modules.java`) |
-| Bundled analyser | SpotBugs **4.8.6** |
+[sb]: https://plugins.jetbrains.com/plugin/14014-spotbugs
+[pmd]: https://plugins.jetbrains.com/plugin/1137-pmd
+
+Both work in Community or Ultimate, and both are current for 2025.2.x — neither
+declares an `until-build`.
 
 ## Install
 
-`Settings → Plugins → ⚙ → Install Plugin from Disk…`, pick the zip, restart the
-IDE. No Marketplace connection is attempted.
+`Settings → Plugins → ⚙ → Install Plugin from Disk…`, pick a zip, repeat for the
+other, then restart once. No Marketplace connection is attempted.
 
-For a team, serving the zip from an internal web server with an
+For a team, serving the zips from an internal web server with an
 `updatePlugins.xml` beats twenty people installing from disk — plugins then show
-up in IDEA's normal search and update flow. Point developers at it with
-`Settings → Plugins → ⚙ → Manage Plugin Repositories → +`.
+up in IDEA's normal search and update flow
+(`Settings → Plugins → ⚙ → Manage Plugin Repositories → +`).
 
-## It reads bytecode, so compile first
+## SpotBugs reads bytecode, so compile first
 
-This is the one thing that confuses people. IDEA's own inspections read your
-*source* as you type. SpotBugs reads **compiled bytecode** — it follows data
-flow across method boundaries, which is how it finds null paths and unclosed
-streams that source-level inspections miss.
+This is the one thing that confuses people. IDEA's own inspections and PMD read
+your *source* as you type. SpotBugs reads **compiled bytecode** — it follows
+data flow across method boundaries, which is how it finds null paths and
+unclosed streams that source-level analysis misses.
 
-The practical consequence: **`Build → Build Project` first.** Analysing a class
-you have edited but not rebuilt reports findings against the old bytecode, with
-line numbers that no longer line up.
+So: **`Build → Build Project` before you analyse.** Analysing a class you edited
+but did not rebuild reports findings against the old bytecode, with line numbers
+that no longer line up.
 
-Then: right-click a class or package → `SpotBugs → Analyze …`, or use the
-SpotBugs tool window for the whole module.
+Then right-click a class or package → `SpotBugs → Analyze …`.
 
-## First-run settings
-
-`Settings → Tools → SpotBugs`
+Under `Settings → Tools → SpotBugs`:
 
 | Setting | Value | Why |
 |---|---|---|
 | Effort | `Max` | Lower settings skip the interprocedural analysis that makes SpotBugs worth running. |
-| Minimum confidence | `Medium` | `Low` roughly triples the findings. Start at `Medium`, drop to `Low` once the report is clean. |
+| Minimum confidence | `Medium` | `Low` roughly triples the findings. Start here, drop to `Low` once the report is clean. |
 | Analysis effort on the fly | off | Max effort on every keystroke will make the IDE crawl on a large module. |
 
-## Adding the newer rule packs
+Add an exclude filter too — `Filter → Exclude filter files → +`, pointing at
+[`spotbugs-rule-packs/spotbugs-exclude.xml`](../../spotbugs-rule-packs/spotbugs-exclude.xml).
+Without one, `EI_EXPOSE_REP` fires on nearly every getter and the report fills
+with thousands of findings nobody reads.
 
-The plugin already bundles rule packs of its own, and they are **older** than
+## Making the IDE run the same rules as the build
+
+Out of the box the two disagree, and each plugin needs one step to fix it.
+
+### SpotBugs — swap in the newer rule packs
+
+The plugin ships its own copies of the rule packs, and they are **older** than
 the ones in [`spotbugs-rule-packs/`](../../spotbugs-rule-packs/):
 
 | Bundled in the plugin | In this repository |
@@ -62,47 +72,70 @@ the ones in [`spotbugs-rule-packs/`](../../spotbugs-rule-packs/):
 | `findsecbugs-plugin-1.12.0` | `findsecbugs-plugin-1.14.0` |
 | `AndroidFindbugs_0.5` | — |
 
-To use the newer ones: `Settings → Tools → SpotBugs → Plugins → +`, then add
-`spotbugs-rule-packs/sb-contrib-7.6.9.jar` and
-`spotbugs-rule-packs/findsecbugs-plugin-1.14.0.jar` from disk.
+`Settings → Tools → SpotBugs → Plugins → +`, add
+`sb-contrib-7.6.9.jar` and `findsecbugs-plugin-1.14.0.jar` from disk, **and
+disable the bundled copy of each one.**
 
-> **Disable the bundled copy of each one first.** SpotBugs refuses to load two
-> plugins with the same plugin id, and these pairs share theirs —
-> `com.mebigfatguy.fbcontrib` and `com.h3xstream.findsecbugs`. Enable both
-> versions and analysis fails outright rather than picking the newer.
+> Disabling is not optional. SpotBugs refuses to load two plugins with the same
+> plugin id, and these pairs share theirs — `com.mebigfatguy.fbcontrib` and
+> `com.h3xstream.findsecbugs`. Leave both enabled and analysis fails outright
+> rather than picking the newer.
 
-## Set an exclude filter
+Going the other way — downgrading this repository to the plugin's versions so
+nothing has to be disabled — does not work. fb-contrib 7.6.0 predates a BCEL
+change in SpotBugs 4.10.4, and three of its detectors
+(`IncorrectInternalClassUse`, `OverlyPermissiveMethod`,
+`FunctionalInterfaceIssues`) throw on every class instead of reporting.
+sb-contrib 7.6.9 is the release that fixed it.
 
-`Settings → Tools → SpotBugs → Filter → Exclude filter files → +`, and point it
-at [`spotbugs-rule-packs/spotbugs-exclude.xml`](../../spotbugs-rule-packs/spotbugs-exclude.xml).
+### PMD — point it at the shared ruleset
 
-Without one, `EI_EXPOSE_REP` and `EI_EXPOSE_REP2` fire on nearly every getter
-and setter. The report fills with thousands of findings, and the team stops
-reading it — which costs more than the two real bugs buried in there.
+`Settings → Tools → PMD`, add
+[`pmd-rulesets/pmd-performance.xml`](../../pmd-rulesets/pmd-performance.xml)
+as a custom ruleset. Run it with right-click → `Run PMD → Custom →
+java-profiling-tools`.
+
+That is the same file `static-scan.sh` passes to the CLI, and it is written to
+load identically on the plugin's PMD 7.21.0 and the bundled 7.27.0 — 68 rules
+against 69, zero configuration errors either way, same findings. Details in
+[`pmd-rulesets/README.md`](../../pmd-rulesets/README.md).
+
+## What ends up running where
+
+After both steps:
+
+| | IDE | `static-scan.sh` |
+|---|---|---|
+| SpotBugs engine | 4.8.6 | 4.10.4 |
+| SpotBugs rule packs | **sb-contrib 7.6.9 + findsecbugs 1.14.0** | **same** |
+| PMD engine | 7.21.0 | 7.27.0 |
+| PMD ruleset | **pmd-performance.xml** | **same** |
+
+The rules match. The engines do not, and cannot: each plugin links against the
+analyser version it was built with, and replacing that inside the plugin is not
+something you can do safely. In practice the difference is small, and where the
+two disagree the CLI is the newer analyser — so the build, not the IDE, is what
+a disagreement should be settled against.
 
 ## The IDE is the convenience, the build is the authority
 
-Run SpotBugs in your build and fail on new findings there. The IDE plugin is for
-the loop while you are writing code; it is not a quality gate, because it only
-covers what someone remembered to right-click. See
+Run both tools in your build and fail on new findings there. The IDE plugins are
+for the loop while you are writing code; they are not a quality gate, because
+they only cover what someone remembered to right-click. See
 [`spotbugs-rule-packs/README.md`](../../spotbugs-rule-packs/README.md#using-these-in-a-build)
 for the CLI and Maven wiring.
 
-One caveat if you compare the two: this plugin bundles SpotBugs **4.8.6**, while
-[`compile-time/spotbugs-4.10.4.tgz`](../../compile-time/) — what `static-scan.sh`
-uses — is **4.10.4**. The findings are close but not identical. When they
-disagree, the CLI is the newer analyser.
-
 ## What this is not
 
-SpotBugs finds bug *patterns*. It does not know which of them is on a hot path,
-and it will happily flag a `String` concatenation that runs once at startup with
-the same emphasis as one inside a 400-iteration loop. Use
+Both tools find *patterns*. Neither knows which of them is on a hot path, and
+both will flag a `String` concatenation that runs once at startup with the same
+emphasis as one inside a 400-iteration loop. Use
 [`diagnose.sh`](../../scripts/diagnose.sh) to find out where the time actually
-goes, then come back here to see whether SpotBugs already had something to say
-about that method.
+goes, then come back here to see whether the analysers already had something to
+say about that method.
 
-## Licence
+## Licences
 
-The SpotBugs IDEA plugin is LGPL 2.1, like SpotBugs itself. It is not covered by
-this repository's [`LICENSE`](../../LICENSE).
+The SpotBugs IDEA plugin is LGPL 2.1, like SpotBugs itself. The PMD plugin is
+BSD-style, like PMD. Neither is covered by this repository's
+[`LICENSE`](../../LICENSE); their terms travel inside their own archives.

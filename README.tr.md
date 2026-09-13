@@ -36,9 +36,10 @@ ne yapmanız gerektiğini söyleyen bir rapor basıyor.
 - [GUI araçları](#gui-araçları)
   - [JMC neden açılmıyordu, nasıl çözüldü](#jmc-neden-açılmıyordu-nasıl-çözüldü)
   - [VisualVM, eklentileri kurulu halde](#visualvm-eklentileri-kurulu-halde)
-- [Statik analiz: SpotBugs](#statik-analiz-spotbugs)
-  - [Kural paketleri](#kural-paketleri)
-  - [IntelliJ IDEA içinde SpotBugs](#intellij-idea-içinde-spotbugs)
+- [Statik analiz: SpotBugs ve PMD](#statik-analiz-spotbugs-ve-pmd)
+  - [SpotBugs kural paketleri](#spotbugs-kural-paketleri)
+  - [PMD ruleset'i](#pmd-ruleseti)
+  - [İkisi de IntelliJ IDEA içinde](#i̇kisi-de-intellij-idea-içinde)
 - [Script referansı](#script-referansı)
 - [Araç referansı](#araç-referansı)
 - [Çıktıyı okumak](#çıktıyı-okumak)
@@ -372,31 +373,34 @@ makinenize kopyalayın.
 
 ---
 
-## Statik analiz: SpotBugs
+## Statik analiz: SpotBugs ve PMD
 
-Profiler size zamanın nereye gittiğini söylüyor. SpotBugs ise oradaki kodun
-*neden* yavaş olmaya yatkın olduğunu söylüyor — üstelik hiçbir şey
+Profiler size zamanın nereye gittiğini söylüyor. SpotBugs ve PMD ise oradaki
+kodun *neden* yavaş olmaya yatkın olduğunu söylüyor — üstelik hiçbir şey
 çalıştırmadan, yani JVM'e hiç bağlanamadığınız bir makinedeki build'e de
 doğrultabilirsiniz.
 
-Kaynağa değil **bytecode**'a bakıyor. Onu IDE'nin kendi inspection'larından
-ayıran şey bu: metot sınırlarını aşarak veri akışını izliyor, dolayısıyla üç
-çağrı aşağıdaki null yolunu, yalnızca mutlu yolda kapatılan stream'i, yanlış
-nesneyi koruyan `synchronized` bloğu bulabiliyor.
+Farklı şeylere baktıkları için ikisi de burada. **SpotBugs bytecode okuyor**:
+metot sınırlarını aşarak veri akışını izliyor, dolayısıyla üç çağrı aşağıdaki
+null yolunu, yalnızca mutlu yolda kapatılan stream'i, yanlış nesneyi koruyan
+`synchronized` bloğu buluyor. **PMD kaynak okuyor**: döngüdeki `+=`'yı,
+ön-boyutlandırılmamış koleksiyonu, hangi sınıftan refactor'a başlayacağınızı
+söyleyen karmaşıklık sayısını görüyor.
 
 ```bash
 ./scripts/static-scan.sh build/classes src/main/java
 ```
 
-Tarama `PERFORMANCE`, `CORRECTNESS` ve `MT_CORRECTNESS` kategorilerini istiyor,
-`-effort:max` ile çalışıyor ve `spotbugs.html`, `pmd.html`, `cpd.txt`
-dosyalarını `$PERF_OUT/static-report/` altına yazıyor.
+SpotBugs `-effort:max` ile `PERFORMANCE`, `CORRECTNESS` ve `MT_CORRECTNESS`
+üzerinde çalışıyor; PMD paylaşılan ruleset'i koşuyor; CPD kopyala-yapıştır
+arıyor. Üç rapor `$PERF_OUT/static-report/` altına `spotbugs.html`, `pmd.html`
+ve `cpd.txt` olarak düşüyor.
 
-Bunlar **aday, kanıt değil.** SpotBugs, başlangıçta bir kez çalışan bir `String`
-birleştirmesini 400 turluk döngünün içindekiyle tam olarak aynı sesle
+Bunlar **aday, kanıt değil.** İki araç da başlangıçta bir kez çalışan bir
+`String` birleştirmesini 400 turluk döngünün içindekiyle tam olarak aynı sesle
 işaretliyor. Bir şeyi değiştirmeden önce `diagnose.sh` ile doğrulayın.
 
-### Kural paketleri
+### SpotBugs kural paketleri
 
 [`spotbugs-rule-packs/`](spotbugs-rule-packs/) içinde iki SpotBugs plugin jar'ı
 var. `static-scan.sh` oradaki her `.jar`'ı otomatik yüklüyor — kurulacak ya da
@@ -427,34 +431,64 @@ varsayılan olarak uygulanıyor ve şunları eliyor: `EI_EXPOSE_REP`/`EI_EXPOSE_
 üzerindeki `switch` için ürettiği `$SwitchMap` tutucusu gibi sentetik sınıflar.
 Filtre olmadan rapor binlerce bulguya çıkıyor ve ekip okumayı bırakıyor.
 
-### IntelliJ IDEA içinde SpotBugs
+### PMD ruleset'i
 
-[`plugins/idea/spotbugs-idea-1.2.8.zip`](plugins/idea/), IntelliJ IDEA için
-SpotBugs eklentisi; internetsiz kurulabilsin diye pakete kondu:
-`Settings → Plugins → ⚙ → Install Plugin from Disk…`. IDEA 2022.2 ve sonrasını
-istiyor, Community ya da Ultimate.
+[`pmd-rulesets/pmd-performance.xml`](pmd-rulesets/pmd-performance.xml),
+`static-scan.sh`'in PMD'ye verdiği ruleset ve IntelliJ PMD eklentisine
+gösterdiğiniz dosyanın aynısı. İki yerde tek dosya, yani IDE ile build aynı
+şeyleri raporluyor.
 
-Bytecode okuduğu için **analizden önce projeyi derleyin** — yoksa bayat class
-dosyaları üzerinden, artık tutmayan satır numaralarıyla bulgu alırsınız.
-Ardından `Settings → Tools → SpotBugs` altında `Effort: Max` ve
-`Minimum confidence: Medium` yapın.
+25 `performance` kuralının hepsini, `multithreading`'in tamamını ve raporu
+gömen dokuz tanesi çıkarılmış hâliyle `design`'ı alıyor — tek başına
+`LawOfDemeter` sıradan Java'nın neredeyse her satırında tetikleniyor. Tek tek
+kurallar yerine bütün kategorilere referans veriyor; eklentinin PMD
+7.21.0'ında da pakete dahil 7.27.0'da da değişmeden yüklenmesini sağlayan bu:
+68'e karşı 69 kural, iki tarafta da sıfır yapılandırma hatası, aynı bulgular.
 
-Eklenti kendi kural paketleriyle geliyor ve bunlar bu depodakilerden eski
-(`fb-contrib 7.6.0` ↔ `sb-contrib 7.6.9`, `findsecbugs 1.12.0` ↔ `1.14.0`).
-Yeni jar'ları kullanmak için `Settings → Tools → SpotBugs → Plugins → +` ile
-ekleyin — ve **önce her birinin gömülü kopyasını devre dışı bırakın**, çünkü
-SpotBugs aynı plugin id'sini paylaşan iki eklentiyi yüklemeyi reddediyor, bu
-çiftler de id'lerini paylaşıyor.
+```bash
+PMD_RULESET=quality/my-pmd.xml ./scripts/static-scan.sh build/classes src/main/java
+PMD_RULESET= ./scripts/static-scan.sh build/classes   # PMD'nin kendi kategorileri
+```
 
-Eklentinin içindeki SpotBugs 4.8.6; `static-scan.sh` ise 4.10.4 kullanıyor.
-Bulgular yakın ama birebir aynı değil, daha yeni çözümleyici CLI'dakidir.
+### İkisi de IntelliJ IDEA içinde
 
-> SpotBugs'ı build'inizde çalıştırın ve yeni bulgularda build'i kırın. IDE
-> eklentisi kod yazarken döndüğünüz döngü için — bir kalite kapısı değil, çünkü
-> yalnızca birinin sağ tıklamayı hatırladığı yeri kapsıyor.
+[`plugins/idea/`](plugins/idea/) iki eklentiyi de tutuyor; internetsiz
+kurulabilsinler diye paketlendiler —
+`Settings → Plugins → ⚙ → Install Plugin from Disk…`:
 
-Ayrıntılar: [`plugins/idea/README.tr.md`](plugins/idea/README.tr.md) ve
-[`spotbugs-rule-packs/README.tr.md`](spotbugs-rule-packs/README.tr.md).
+| Eklenti | Gereksinim | İçindeki motor | Ayar sayfası |
+|---|---|---|---|
+| `spotbugs-idea-1.2.8.zip` | IDEA 2022.2+ | SpotBugs 4.8.6 | `Settings → Tools → SpotBugs` |
+| `PMDPlugin-2.1.0.zip` | IDEA 2024.1+ | PMD 7.21.0 | `Settings → Tools → PMD` |
+
+SpotBugs bytecode okuduğu için **analizden önce projeyi derleyin** — yoksa
+bayat class dosyaları üzerinden, artık tutmayan satır numaralarıyla bulgu
+alırsınız. `Effort: Max` ve `Minimum confidence: Medium` yapın.
+
+IDE'nin build ile aynı kuralları çalıştırması iki adım istiyor. PMD için
+yukarıdaki paylaşılan ruleset'i ekleyin. SpotBugs için `Plugins → +` altına
+`sb-contrib-7.6.9.jar` ve `findsecbugs-plugin-1.14.0.jar` ekleyin — **ve
+eklentinin getirdiği eski kopyaları devre dışı bırakın**, çünkü SpotBugs aynı
+plugin id'sini paylaşan iki eklentiyi yüklemeyi reddediyor, bu çiftler de
+id'lerini paylaşıyor.
+
+Bunun yerine depoyu eklentinin kural paketi sürümlerine indirmek işe yaramıyor:
+fb-contrib 7.6.0, SpotBugs 4.10.4'teki bir BCEL değişikliğinden eski kalıyor ve
+üç dedektörü rapor üretmek yerine her sınıfta hata fırlatıyor. sb-contrib 7.6.9
+bunu düzelten sürüm.
+
+Bu iki adımdan sonra **kurallar** her yerde aynı. **Motorlar** hâlâ farklı —
+4.8.6 ↔ 4.10.4, 7.21.0 ↔ 7.27.0 — çünkü her eklenti derlendiği çözümleyiciye
+bağlı. İkisi çeliştiğinde daha yeni çözümleyici CLI'daki; yani anlaşmazlığı
+build'e göre çözün.
+
+> İki aracı da build'inizde çalıştırın ve yeni bulgularda build'i kırın. IDE
+> eklentileri kod yazarken döndüğünüz döngü için — kalite kapısı değiller,
+> çünkü yalnızca birinin sağ tıklamayı hatırladığı yeri kapsıyorlar.
+
+Ayrıntılar: [`plugins/idea/README.tr.md`](plugins/idea/README.tr.md),
+[`spotbugs-rule-packs/README.tr.md`](spotbugs-rule-packs/README.tr.md) ve
+[`pmd-rulesets/README.tr.md`](pmd-rulesets/README.tr.md).
 
 ---
 
@@ -580,12 +614,13 @@ sayı olmayan bir değeri sessizce sıfır saniye profil almak yerine reddediyor
 Bytecode üzerinde SpotBugs (PERFORMANCE, CORRECTNESS, MT_CORRECTNESS), kaynak
 üzerinde PMD (performance + design), ayrıca kopyala-yapıştır tespiti.
 
-[`spotbugs-rule-packs/`](spotbugs-rule-packs/) içindeki iki kural paketi ve
-yanlarındaki exclude filtresi otomatik yükleniyor; o klasöre başka jar'lar
-atarsanız onlar da alınıyor. `--categories LISTE` kategori listesini tamamen
-değiştiriyor; `SPOTBUGS_RULE_PACKS`, `SPOTBUGS_CATEGORIES` ve `SPOTBUGS_EXCLUDE`
-ise üç varsayılanı ortamdan eziyor. Bkz.
-[Statik analiz: SpotBugs](#statik-analiz-spotbugs).
+[`spotbugs-rule-packs/`](spotbugs-rule-packs/) içindeki iki kural paketi,
+yanlarındaki exclude filtresi ve [`pmd-rulesets/`](pmd-rulesets/) içindeki PMD
+ruleset'i otomatik yükleniyor; o klasöre başka jar'lar atarsanız onlar da
+alınıyor. `--categories LISTE` kategori listesini tamamen değiştiriyor;
+`SPOTBUGS_RULE_PACKS`, `SPOTBUGS_CATEGORIES`, `SPOTBUGS_EXCLUDE` ve
+`PMD_RULESET` ise varsayılanları ortamdan eziyor. Bkz.
+[Statik analiz: SpotBugs ve PMD](#statik-analiz-spotbugs-ve-pmd).
 
 Bunlar **aday** bulur, kanıt değil. Bir şeyi değiştirmeden önce profille
 doğrulayın.
@@ -633,6 +668,7 @@ sonuç `$PERF_OUT/jmh/result-<zaman>.json` dosyasına yazılıyor.
 | **Find Security Bugs** | 1.14.0 | SpotBugs kural paketi: 144 SECURITY deseni (`--security`) |
 | **IDEA için SpotBugs** | 1.2.8 | Aynı analiz IntelliJ içinde, offline kurulabilir |
 | **PMD / CPD** | 7.27.0 | Kaynak analizi ve kopyala-yapıştır tespiti |
+| **IDEA için PMD** | 2.1.0 | Aynı ruleset IntelliJ içinde, offline kurulabilir |
 | **JaCoCo** | 0.8.15 | Kapsam — hangi kodun gerçekten çalıştığını bilmek için |
 | **JMH** | 1.37 | JIT oyunlarına dayanan mikrobenchmark'lar |
 | **JOL** | 0.17 | Nesne bellek düzeni, bayt bayt |
@@ -808,8 +844,9 @@ java-profiling-tools/
 ├── compile-time/            SpotBugs, PMD (parçalı), JaCoCo, JOL
 ├── plugins/
 │   ├── visualvm/            21 .nbm modülü, 00-setup.sh tarafından offline kuruluyor
-│   └── idea/                IntelliJ IDEA için SpotBugs eklentisi
+│   └── idea/                IntelliJ IDEA için SpotBugs + PMD eklentileri
 ├── spotbugs-rule-packs/     sb-contrib + findsecbugs ve exclude filtresi
+├── pmd-rulesets/            CLI ve IDE'nin paylaştığı PMD ruleset'i
 ├── jmh/                     JMH jar'ları, bir çalıştırıcı ve örnek benchmark
 ├── docs/                    ekran görüntüleri ve nasıl üretildikleri
 ├── tools/                   00-setup.sh üretiyor  (git'te yok)
@@ -851,5 +888,6 @@ sha256sum -c SHA256SUMS.txt
 Bu depodaki script'ler ve dokümantasyon [`LICENSE`](LICENSE) dosyasındaki
 koşullarla dağıtılıyor. Paketlenmiş üçüncü parti araçlar kendi lisanslarını
 koruyor — GPLv2+CE (OpenJDK, VisualVM), EPL (JMC, MAT, JaCoCo), Apache 2.0
-(async-profiler, PMD, JMH, JOL), LGPL (SpotBugs ve IDEA eklentisi, sb-contrib,
-Find Security Bugs) — ve lisans dosyaları kendi arşivlerinin içinde geliyor.
+(async-profiler, PMD ve IDEA eklentisi, JMH, JOL), LGPL (SpotBugs ve IDEA
+eklentisi, sb-contrib, Find Security Bugs) — ve lisans dosyaları kendi
+arşivlerinin içinde geliyor.
