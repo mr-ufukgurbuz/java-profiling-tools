@@ -472,6 +472,8 @@ eklentinin getirdiği eski kopyaları devre dışı bırakın**, çünkü SpotBu
 plugin id'sini paylaşan iki eklentiyi yüklemeyi reddediyor, bu çiftler de
 id'lerini paylaşıyor.
 
+![IDE'yi build ile hizalayan iki adım](docs/images/14-ide-setup-steps.svg)
+
 Bunun yerine depoyu eklentinin kural paketi sürümlerine indirmek işe yaramıyor:
 fb-contrib 7.6.0, SpotBugs 4.10.4'teki bir BCEL değişikliğinden eski kalıyor ve
 üç dedektörü rapor üretmek yerine her sınıfta hata fırlatıyor. sb-contrib 7.6.9
@@ -481,6 +483,8 @@ Bu iki adımdan sonra **kurallar** her yerde aynı. **Motorlar** hâlâ farklı 
 4.8.6 ↔ 4.10.4, 7.21.0 ↔ 7.27.0 — çünkü her eklenti derlendiği çözümleyiciye
 bağlı. İkisi çeliştiğinde daha yeni çözümleyici CLI'daki; yani anlaşmazlığı
 build'e göre çözün.
+
+![Kurallar nereden geliyor, onları ne çalıştırıyor](docs/images/13-ide-vs-cli.svg)
 
 > İki aracı da build'inizde çalıştırın ve yeni bulgularda build'i kırın. IDE
 > eklentileri kod yazarken döndüğünüz döngü için — kalite kapısı değiller,

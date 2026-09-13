@@ -2,9 +2,15 @@
 
 **[English](README.md) · [Türkçe](README.tr.md)**
 
-[`images/`](images/) klasöründeki görsellerin hepsi **gerçek çalıştırmalardan**
-alındı. Hiçbiri elle düzenlenmedi, montajlanmadı veya yeniden yazılmadı. Ana
-README'de anlatılan her şeyin gerçekten çalıştığını göstermek için buradalar.
+[`images/`](images/) klasöründeki **ekran görüntülerinin** hepsi **gerçek
+çalıştırmalardan** alındı. Hiçbiri elle düzenlenmedi, montajlanmadı veya
+yeniden yazılmadı. Ana README'de anlatılan her şeyin gerçekten çalıştığını
+göstermek için buradalar.
+
+İki `.svg` dosyası istisna ve bunlar ekran görüntüsü değil: IntelliJ
+eklentileriyle komut satırının ilişkisini anlatan **çizilmiş diyagramlar**.
+Aşağıdaki tabloda öyle işaretliler. Bu klasörde çalıştırılmamış bir programın
+taklidi hiçbir şey yok.
 
 ## Ölçülen uygulama
 
@@ -47,6 +53,8 @@ ve `sleep` `synchronized` bloğun dışına çıkarıldı.
 | `10-jmc-automated-analysis.png` | JMC, `recording.jfr` açık, Automated Analysis Results | Xvfb |
 | `11-visualvm-plugins.png` | VisualVM: eklenti sekmeleri + Visual GC canlı veri çiziyor | Xvfb |
 | `12-jmh-before-after.png` | `jmh-run.sh` — string concat vs ön-boyutlu `StringBuilder` | terminal |
+| `13-ide-vs-cli.svg` | IDE ve `static-scan.sh` hangi kuralları çalıştırıyor | **çizim** |
+| `14-ide-setup-steps.svg` | IDE'yi build ile hizalayan iki ayar adımı | **çizim** |
 
 ## Üretim yöntemi
 
@@ -61,6 +69,11 @@ ve `sleep` `synchronized` bloğun dışına çıkarıldı.
 
 Üretim script'i bu klasörde tutulmuyor: tek seferlik bir dokümantasyon aracı,
 paketin kendi işleyişinin parçası değil.
+
+- **Diyagramlar** — elle yazılmış SVG; çizim programı da kullanılmadı, dışarıdan
+  görsel de alınmadı. Kendi açık zeminlerini taşıyorlar, böylece GitHub'ın açık
+  ve koyu temasında aynı okunuyorlar; içlerindeki sürüm numaraları da bu deponun
+  gerçekten getirdiği sürümler.
 
 ## Neden özellikle bu ikisi
 

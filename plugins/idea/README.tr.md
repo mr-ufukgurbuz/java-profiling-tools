@@ -64,6 +64,8 @@ kimsenin okumadığı binlerce bulguyla doluyor.
 Kutudan çıktığı hâliyle ikisi farklı davranıyor; her eklenti için bunu
 düzeltecek bir adım var.
 
+![Makine başına bir kez, iki adım](../../docs/images/14-ide-setup-steps.svg)
+
 ### SpotBugs — yeni kural paketlerini devreye alın
 
 Eklenti kural paketlerinin kendi kopyalarıyla geliyor ve bunlar
@@ -105,6 +107,8 @@ bulgular. Ayrıntılar:
 [`pmd-rulesets/README.tr.md`](../../pmd-rulesets/README.tr.md).
 
 ## Sonuçta nerede ne çalışıyor
+
+![Tek kural seti, onu çalıştıran iki yer](../../docs/images/13-ide-vs-cli.svg)
 
 Her iki adımdan sonra:
 

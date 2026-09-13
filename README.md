@@ -461,6 +461,8 @@ ruleset above. For SpotBugs, add `sb-contrib-7.6.9.jar` and
 copies the plugin bundles**, because SpotBugs refuses to load two plugins
 sharing a plugin id and these pairs share theirs.
 
+![Two steps to align the IDE with the build](docs/images/14-ide-setup-steps.svg)
+
 Downgrading this repository to the plugin's rule-pack versions instead does not
 work: fb-contrib 7.6.0 predates a BCEL change in SpotBugs 4.10.4 and three of
 its detectors throw on every class rather than reporting. sb-contrib 7.6.9 is
@@ -470,6 +472,8 @@ After those two steps the **rules** match everywhere. The **engines** still
 differ — 4.8.6 vs 4.10.4, 7.21.0 vs 7.27.0 — because each plugin links against
 the analyser it was built with. Where the two disagree, the CLI is the newer
 analyser, so settle it against the build.
+
+![Where the rules come from and what runs them](docs/images/13-ide-vs-cli.svg)
 
 > Run both tools in your build and fail on new findings there. The IDE plugins
 > are for the loop while you write code — they are not a quality gate, because

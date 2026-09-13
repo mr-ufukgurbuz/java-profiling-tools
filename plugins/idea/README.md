@@ -61,6 +61,8 @@ with thousands of findings nobody reads.
 
 Out of the box the two disagree, and each plugin needs one step to fix it.
 
+![Two steps, once per machine](../../docs/images/14-ide-setup-steps.svg)
+
 ### SpotBugs — swap in the newer rule packs
 
 The plugin ships its own copies of the rule packs, and they are **older** than
@@ -101,6 +103,8 @@ against 69, zero configuration errors either way, same findings. Details in
 [`pmd-rulesets/README.md`](../../pmd-rulesets/README.md).
 
 ## What ends up running where
+
+![One set of rules, two places that run them](../../docs/images/13-ide-vs-cli.svg)
 
 After both steps:
 

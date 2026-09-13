@@ -2,9 +2,14 @@
 
 **[English](README.md) · [Türkçe](README.tr.md)**
 
-Every image in [`images/`](images/) comes from a **real run**. None of them was
-edited, composited or retouched. They are here to show that what the main
-README describes actually works.
+Every **screenshot** in [`images/`](images/) comes from a **real run**. None of
+them was edited, composited or retouched. They are here to show that what the
+main README describes actually works.
+
+The two `.svg` files are the exception, and they are not screenshots: they are
+**drawn diagrams** of how the IntelliJ plugins and the command line relate.
+They are labelled as such in the table below. Nothing in this directory is a
+mock-up of a program that was not run.
 
 ## The application being measured
 
@@ -47,6 +52,8 @@ Images 8 and 12 additionally show the **fixed** version: the regex hoisted to a
 | `10-jmc-automated-analysis.png` | JMC with `recording.jfr` open, Automated Analysis Results | Xvfb |
 | `11-visualvm-plugins.png` | VisualVM: plugin tabs + Visual GC drawing live data | Xvfb |
 | `12-jmh-before-after.png` | `jmh-run.sh` — string concat vs a pre-sized `StringBuilder` | terminal |
+| `13-ide-vs-cli.svg` | Which rules the IDE and `static-scan.sh` each run | **drawn diagram** |
+| `14-ide-setup-steps.svg` | The two settings steps that align the IDE with the build | **drawn diagram** |
 
 ## How they were produced
 
@@ -61,6 +68,11 @@ Images 8 and 12 additionally show the **fixed** version: the regex hoisted to a
 
 The generator itself is not kept in this directory: it is a one-off
 documentation tool, not part of how the toolkit works.
+
+- **Diagrams** — hand-written SVG, no drawing tool and no imported artwork. They
+  carry their own light background so they read the same in GitHub's light and
+  dark themes, and the version numbers in them are the ones this repository
+  actually ships.
 
 ## Why these two in particular
 
