@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Exclude filter used by scripts/static-scan.sh.
+
+  Without a filter like this one, a scan with the rule packs enabled comes back
+  with thousands of findings, most of them EI_EXPOSE_REP, and people stop
+  reading the report. That is the failure mode this file exists to prevent.
+
+  To run WITHOUT it:            SPOTBUGS_EXCLUDE= ./scripts/static-scan.sh build/classes
+  To use your project's own:    SPOTBUGS_EXCLUDE=quality/my-exclude.xml ./scripts/static-scan.sh build/classes
+
+  Filter-file syntax: https://spotbugs.readthedocs.io/en/latest/filter.html
+-->
+<FindBugsFilter
+    xmlns="https://github.com/spotbugs/filter/3.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/master/spotbugs/etc/findbugsfilter.xsd">
+
+    <!-- Returning/storing a mutable object. Correct in the abstract, but on a
+         real codebase it fires on nearly every getter and buries everything
+         else. Turn it back on in a dedicated review pass, not in a perf scan. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2,MS_EXPOSE_REP"/>
+    </Match>
+
+    <!-- Test code: not on any hot path, and the patterns below are normal in
+         tests (deliberately odd inputs, asserts that look like dead stores). -->
+    <Match>
+        <Or>
+            <Class name="~.*\.Test[^.]*$"/>
+            <Class name="~.*[^.]*Test$"/>
+            <Class name="~.*[^.]*Tests$"/>
+            <Class name="~.*[^.]*TestCase$"/>
+            <Class name="~.*\.test\..*"/>
+        </Or>
+    </Match>
+
+    <!-- Generated code. Lombok marks its output @lombok.Generated when
+         lombok.addLombokGeneratedAnnotation = true; SpotBugs skips anything
+         annotated that way, so this only catches the other generators. -->
+    <Match>
+        <Or>
+            <Class name="~.*\$\$.*"/>
+            <Source name="~.*[/\\]generated[/\\].*"/>
+        </Or>
+    </Match>
+
+    <!-- Switch statements over an enum: javac synthesises a $SwitchMap array
+         that trips MS_MUTABLE_ARRAY / NP_* in code nobody wrote. -->
+    <Match>
+        <Class name="~.*\$[0-9]+$"/>
+    </Match>
+
+</FindBugsFilter>

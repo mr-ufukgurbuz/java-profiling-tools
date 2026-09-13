@@ -37,6 +37,9 @@ is costing you, and what to do about it.
 - [The GUI tools](#the-gui-tools)
   - [Why JMC would not open, and how that is fixed](#why-jmc-would-not-open-and-how-that-is-fixed)
   - [VisualVM, with its plugins already installed](#visualvm-with-its-plugins-already-installed)
+- [Static analysis: SpotBugs](#static-analysis-spotbugs)
+  - [The rule packs](#the-rule-packs)
+  - [SpotBugs inside IntelliJ IDEA](#spotbugs-inside-intellij-idea)
 - [Script reference](#script-reference)
 - [Tool reference](#tool-reference)
 - [Reading the output](#reading-the-output)
@@ -360,6 +363,92 @@ the GUI, either `ssh -X`, or copy the `.jfr` / `.hprof` to your workstation.
 
 ---
 
+## Static analysis: SpotBugs
+
+A profiler tells you where the time went. SpotBugs tells you *why* the code
+there was likely to be slow — and it does it without running anything, which
+means you can point it at a build on a machine where you cannot attach to the
+JVM at all.
+
+It reads **bytecode**, not source. That is what separates it from an IDE's own
+inspections: it follows data flow across method boundaries, so it finds the null
+path three calls down, the stream that is only closed on the happy path, the
+`synchronized` block guarding the wrong object.
+
+```bash
+./scripts/static-scan.sh build/classes src/main/java
+```
+
+The scan asks for `PERFORMANCE`, `CORRECTNESS` and `MT_CORRECTNESS`, runs at
+`-effort:max`, and writes `spotbugs.html`, `pmd.html` and `cpd.txt` into
+`$PERF_OUT/static-report/`.
+
+These are **candidates, not proof.** SpotBugs flags a `String` concatenation
+that runs once at startup exactly as loudly as one inside a 400-iteration loop.
+Confirm with `diagnose.sh` before you change anything.
+
+### The rule packs
+
+[`spotbugs-rule-packs/`](spotbugs-rule-packs/) holds two SpotBugs plugin jars.
+`static-scan.sh` loads every `.jar` it finds there automatically — there is
+nothing to install and nothing to configure.
+
+| Pack | Patterns | What it adds |
+|---|---|---|
+| `sb-contrib-7.6.9` | 319 | 43 more PERFORMANCE patterns — unbounded field growth, write-only collections, boxing in loops, `keySet()`-then-`get()` iteration |
+| `findsecbugs-plugin-1.14.0` | 144 | Deserialization, path traversal, weak crypto, XXE, command injection |
+
+SpotBugs 4.10.4 on its own has 518 patterns, 37 of them PERFORMANCE — so
+sb-contrib more than doubles what is available for performance work.
+
+Every one of findsecbugs' 144 patterns is in the `SECURITY` category, which the
+scan does not ask for by default. That is deliberate: this is a profiling
+toolkit, and a performance report that also lists every XXE risk is a report
+nobody finishes. Ask for it when you want it:
+
+```bash
+./scripts/static-scan.sh --security build/classes    # + the SECURITY category
+./scripts/static-scan.sh --no-exclude build/classes  # no exclude filter
+```
+
+The exclude filter is the other half of making this usable.
+[`spotbugs-rule-packs/spotbugs-exclude.xml`](spotbugs-rule-packs/spotbugs-exclude.xml)
+is applied by default and drops `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` (they fire on
+nearly every getter), test classes, and synthetic classes such as the
+`$SwitchMap` holder javac generates for a `switch` over an enum. Without it the
+report runs to thousands of findings and the team stops reading it.
+
+### SpotBugs inside IntelliJ IDEA
+
+[`plugins/idea/spotbugs-idea-1.2.8.zip`](plugins/idea/) is the SpotBugs plugin
+for IntelliJ IDEA, bundled so it can be installed with no internet:
+`Settings → Plugins → ⚙ → Install Plugin from Disk…`. It needs IDEA 2022.2 or
+later, Community or Ultimate.
+
+Because it reads bytecode, **build the project before you analyse** — otherwise
+you get findings against stale class files, with line numbers that no longer
+match. Then set `Effort: Max` and `Minimum confidence: Medium` under
+`Settings → Tools → SpotBugs`.
+
+The plugin bundles its own rule packs, and they are older than the ones in this
+repository (`fb-contrib 7.6.0` vs `sb-contrib 7.6.9`, `findsecbugs 1.12.0` vs
+`1.14.0`). To use the newer jars, add them under
+`Settings → Tools → SpotBugs → Plugins → +` — and **disable the bundled copy of
+each first**, because SpotBugs refuses to load two plugins sharing a plugin id
+and these pairs share theirs.
+
+The plugin bundles SpotBugs 4.8.6; `static-scan.sh` uses 4.10.4. Findings are
+close but not identical, and the CLI is the newer analyser.
+
+> Run SpotBugs in your build and fail on new findings there. The IDE plugin is
+> for the loop while you write code — it is not a quality gate, because it only
+> covers what someone remembered to right-click.
+
+Full details in [`plugins/idea/README.md`](plugins/idea/README.md) and
+[`spotbugs-rule-packs/README.md`](spotbugs-rule-packs/README.md).
+
+---
+
 ## Script reference
 
 Every script is self-documenting: run it with `-h` for the same text.
@@ -472,12 +561,19 @@ that is not a number rather than silently profiling for zero seconds.
 
 ```bash
 ./scripts/static-scan.sh build/classes src/main/java
+./scripts/static-scan.sh --security build/classes      # + the SECURITY category
+./scripts/static-scan.sh --no-exclude build/classes    # report everything
 ```
 
 SpotBugs over the bytecode (PERFORMANCE, CORRECTNESS, MT_CORRECTNESS), PMD over
-the source (performance + design), plus copy-paste detection. Drop extra rule
-packs (`sb-contrib`, `findsecbugs`) into `spotbugs-rule-packs/` and they are
-picked up automatically.
+the source (performance + design), plus copy-paste detection.
+
+The two rule packs in [`spotbugs-rule-packs/`](spotbugs-rule-packs/) are loaded
+automatically, as is the exclude filter next to them; drop more jars in that
+directory and they are picked up too. `--categories LIST` replaces the category
+list outright, and `SPOTBUGS_RULE_PACKS`, `SPOTBUGS_CATEGORIES` and
+`SPOTBUGS_EXCLUDE` override the three defaults from the environment. See
+[Static analysis: SpotBugs](#static-analysis-spotbugs).
 
 These find **candidates**, not proof. Confirm with a profile before changing
 anything.
@@ -519,7 +615,10 @@ result written to `$PERF_OUT/jmh/result-<timestamp>.json`.
 | **MAT** | 1.17.0 | Heap-dump analysis, Leak Suspects, dominator tree |
 | **jfr-converter** | bundled | Turns a JFR recording into a flame graph without async-profiler |
 | **GCViewer** | 1.37 | Visualises GC logs |
-| **SpotBugs** | 4.10.4 | Bytecode analysis (performance + correctness) |
+| **SpotBugs** | 4.10.4 | Bytecode analysis (performance + correctness) — 518 patterns |
+| **sb-contrib** | 7.6.9 | SpotBugs rule pack: 319 more patterns, 43 of them PERFORMANCE |
+| **Find Security Bugs** | 1.14.0 | SpotBugs rule pack: 144 SECURITY patterns (`--security`) |
+| **SpotBugs for IDEA** | 1.2.8 | The same analysis inside IntelliJ, installable offline |
 | **PMD / CPD** | 7.27.0 | Source analysis and copy-paste detection |
 | **JaCoCo** | 0.8.15 | Coverage — to know which code is actually exercised |
 | **JMH** | 1.37 | Microbenchmarks that survive JIT trickery |
@@ -694,7 +793,10 @@ java-profiling-tools/
 ├── jdk/                     JDK 21 archive (split)
 ├── runtime/                 async-profiler, JMC, MAT, VisualVM, GCViewer, jfr-converter
 ├── compile-time/            SpotBugs, PMD (split), JaCoCo, JOL
-├── plugins/visualvm/        21 .nbm modules, installed offline by 00-setup.sh
+├── plugins/
+│   ├── visualvm/            21 .nbm modules, installed offline by 00-setup.sh
+│   └── idea/                SpotBugs plugin for IntelliJ IDEA
+├── spotbugs-rule-packs/     sb-contrib + findsecbugs, and the exclude filter
 ├── jmh/                     JMH jars, a runner, and an example benchmark
 ├── docs/                    screenshots, and how they were made
 ├── tools/                   created by 00-setup.sh  (git-ignored)
@@ -736,5 +838,5 @@ sha256sum -c SHA256SUMS.txt
 The scripts and documentation in this repository are released under the terms
 in [`LICENSE`](LICENSE). The bundled third-party tools keep their own licences —
 GPLv2+CE (OpenJDK, VisualVM), EPL (JMC, MAT, JaCoCo), Apache 2.0
-(async-profiler, PMD, JMH, JOL), LGPL (SpotBugs) — and their licence files
-travel inside their own archives.
+(async-profiler, PMD, JMH, JOL), LGPL (SpotBugs and its IDEA plugin, sb-contrib,
+Find Security Bugs) — and their licence files travel inside their own archives.

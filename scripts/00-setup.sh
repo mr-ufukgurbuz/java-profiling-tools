@@ -362,6 +362,15 @@ check "VisualVM launcher"  "$TOOLS/visualvm/bin/visualvm"     1
 check "SpotBugs"           "$TOOLS/spotbugs/bin/spotbugs"     1
 check "PMD"                "$TOOLS/pmd/bin/pmd"               1
 
+# The SpotBugs rule packs are NOT unpacked: static-scan.sh hands the jars to
+# SpotBugs with -pluginList, and in IntelliJ you add the same jars from disk.
+NPACKS=$(find "$HERE/spotbugs-rule-packs" -maxdepth 1 -name '*.jar' 2>/dev/null | wc -l)
+if [ "$NPACKS" -gt 0 ]; then
+  printf '  %s[ok     ]%s %-24s %s jar(s)\n' "$G" "$Z" "SpotBugs rule packs" "$NPACKS"
+else
+  printf '  %s[  -    ]%s %-24s none found in spotbugs-rule-packs/\n' "$Y" "$Z" "SpotBugs rule packs"
+fi
+
 # Did the -vm line actually land? This is where people get stuck most often.
 verify_vm() { # verify_vm <ini> <label>
   local ini="$1" label="$2"

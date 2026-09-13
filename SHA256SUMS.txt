@@ -16,6 +16,7 @@ d5d807541d23ea0180a645ab0f1337e05ec9dcddd0726b1c6f2a8acf99db779b  jdk/OpenJDK21U
 dc0eaf2bbf0036a70b60798c785d6e03a9daf06b68b8edb0f1ba9eb3421baeb3  jmh/lib/jmh-core-1.37.jar
 6a5604b5b804e0daca1145df1077609321687734a8b49387e49f10557c186c77  jmh/lib/jmh-generator-annprocess-1.37.jar
 df26cc58f235f477db07f753ba5a3ab243ebe5789d9f89ecf68dd62ea9a66c28  jmh/lib/jopt-simple-5.0.4.jar
+e6aab232a13b6844f488daa5106d1dbfe3ff2b24fa4e792a18bd4d486f704f6e  plugins/idea/spotbugs-idea-1.2.8.zip
 40ab4769979440fa8a0248224dd7dead7c3643fbb5a8db601de64fb5e3f3e6a9  plugins/visualvm/jsyntaxpane-lib.nbm
 50aa92bc69f51f0cf7673b1e8dd5b70fb34508eedfdcb4e8ffbac0969d8dfaf6  plugins/visualvm/org-graalvm-visualvm-modules-buffermonitor.nbm
 7c74d748dd907dd48dc281c185f7722a2b9f539349c1cd64cc0e578774bea931  plugins/visualvm/org-graalvm-visualvm-modules-extensions.nbm
@@ -43,3 +44,5 @@ e1ea80a7984d411e4c4d7dfbab092da9255f7b772d681a256a61049bcc883767  runtime/Memory
 41a3b07cd73a8f800814856a622449530f645662d5b274fbd040f1a82b032aee  runtime/jfr-converter.jar
 3085244b8f32bbd0646c8109a9f65f7089497e07e1d6bbc62f64da942d27d748  runtime/org.openjdk.jmc-9.1.2-linux.gtk.x86_64.tar.gz
 6884c908c9e10a959dea8e7b168b496515c0310d6b86a35ce96b8197231f4ef3  runtime/visualvm_221.zip
+6fa340344fa433ff46c2985dab1010e8bc739f9395c983594a5240095e92abc8  spotbugs-rule-packs/findsecbugs-plugin-1.14.0.jar
+9203f1af681600039a316f2fa6ca9d8ce52bbe3b4253aaf7321a3dfae914ab2b  spotbugs-rule-packs/sb-contrib-7.6.9.jar

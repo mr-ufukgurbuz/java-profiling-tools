@@ -36,6 +36,9 @@ ne yapmanız gerektiğini söyleyen bir rapor basıyor.
 - [GUI araçları](#gui-araçları)
   - [JMC neden açılmıyordu, nasıl çözüldü](#jmc-neden-açılmıyordu-nasıl-çözüldü)
   - [VisualVM, eklentileri kurulu halde](#visualvm-eklentileri-kurulu-halde)
+- [Statik analiz: SpotBugs](#statik-analiz-spotbugs)
+  - [Kural paketleri](#kural-paketleri)
+  - [IntelliJ IDEA içinde SpotBugs](#intellij-idea-içinde-spotbugs)
 - [Script referansı](#script-referansı)
 - [Araç referansı](#araç-referansı)
 - [Çıktıyı okumak](#çıktıyı-okumak)
@@ -369,6 +372,92 @@ makinenize kopyalayın.
 
 ---
 
+## Statik analiz: SpotBugs
+
+Profiler size zamanın nereye gittiğini söylüyor. SpotBugs ise oradaki kodun
+*neden* yavaş olmaya yatkın olduğunu söylüyor — üstelik hiçbir şey
+çalıştırmadan, yani JVM'e hiç bağlanamadığınız bir makinedeki build'e de
+doğrultabilirsiniz.
+
+Kaynağa değil **bytecode**'a bakıyor. Onu IDE'nin kendi inspection'larından
+ayıran şey bu: metot sınırlarını aşarak veri akışını izliyor, dolayısıyla üç
+çağrı aşağıdaki null yolunu, yalnızca mutlu yolda kapatılan stream'i, yanlış
+nesneyi koruyan `synchronized` bloğu bulabiliyor.
+
+```bash
+./scripts/static-scan.sh build/classes src/main/java
+```
+
+Tarama `PERFORMANCE`, `CORRECTNESS` ve `MT_CORRECTNESS` kategorilerini istiyor,
+`-effort:max` ile çalışıyor ve `spotbugs.html`, `pmd.html`, `cpd.txt`
+dosyalarını `$PERF_OUT/static-report/` altına yazıyor.
+
+Bunlar **aday, kanıt değil.** SpotBugs, başlangıçta bir kez çalışan bir `String`
+birleştirmesini 400 turluk döngünün içindekiyle tam olarak aynı sesle
+işaretliyor. Bir şeyi değiştirmeden önce `diagnose.sh` ile doğrulayın.
+
+### Kural paketleri
+
+[`spotbugs-rule-packs/`](spotbugs-rule-packs/) içinde iki SpotBugs plugin jar'ı
+var. `static-scan.sh` oradaki her `.jar`'ı otomatik yüklüyor — kurulacak ya da
+yapılandırılacak bir şey yok.
+
+| Paket | Desen | Ne ekliyor |
+|---|---|---|
+| `sb-contrib-7.6.9` | 319 | 43 PERFORMANCE deseni daha — sınırsız büyüyen alanlar, yalnızca yazılan koleksiyonlar, döngüde boxing, `keySet()` sonra `get()` iterasyonu |
+| `findsecbugs-plugin-1.14.0` | 144 | Deserialization, path traversal, zayıf kripto, XXE, komut enjeksiyonu |
+
+SpotBugs 4.10.4 tek başına 518 desen içeriyor, bunların 37'si PERFORMANCE — yani
+sb-contrib, performans işi için elinizdekini iki katından fazlasına çıkarıyor.
+
+findsecbugs'ın 144 deseninin tamamı `SECURITY` kategorisinde ve tarama
+varsayılanda bu kategoriyi istemiyor. Bu bilinçli: burası bir profilleme paketi
+ve her XXE riskini de sıralayan bir performans raporunu kimse sonuna kadar
+okumuyor. İstediğinizde açın:
+
+```bash
+./scripts/static-scan.sh --security build/classes    # + SECURITY kategorisi
+./scripts/static-scan.sh --no-exclude build/classes  # exclude filtresi yok
+```
+
+Bunu kullanılabilir kılan ikinci yarı exclude filtresi.
+[`spotbugs-rule-packs/spotbugs-exclude.xml`](spotbugs-rule-packs/spotbugs-exclude.xml)
+varsayılan olarak uygulanıyor ve şunları eliyor: `EI_EXPOSE_REP`/`EI_EXPOSE_REP2`
+(neredeyse her getter'da tetikleniyorlar), test sınıfları ve javac'ın enum
+üzerindeki `switch` için ürettiği `$SwitchMap` tutucusu gibi sentetik sınıflar.
+Filtre olmadan rapor binlerce bulguya çıkıyor ve ekip okumayı bırakıyor.
+
+### IntelliJ IDEA içinde SpotBugs
+
+[`plugins/idea/spotbugs-idea-1.2.8.zip`](plugins/idea/), IntelliJ IDEA için
+SpotBugs eklentisi; internetsiz kurulabilsin diye pakete kondu:
+`Settings → Plugins → ⚙ → Install Plugin from Disk…`. IDEA 2022.2 ve sonrasını
+istiyor, Community ya da Ultimate.
+
+Bytecode okuduğu için **analizden önce projeyi derleyin** — yoksa bayat class
+dosyaları üzerinden, artık tutmayan satır numaralarıyla bulgu alırsınız.
+Ardından `Settings → Tools → SpotBugs` altında `Effort: Max` ve
+`Minimum confidence: Medium` yapın.
+
+Eklenti kendi kural paketleriyle geliyor ve bunlar bu depodakilerden eski
+(`fb-contrib 7.6.0` ↔ `sb-contrib 7.6.9`, `findsecbugs 1.12.0` ↔ `1.14.0`).
+Yeni jar'ları kullanmak için `Settings → Tools → SpotBugs → Plugins → +` ile
+ekleyin — ve **önce her birinin gömülü kopyasını devre dışı bırakın**, çünkü
+SpotBugs aynı plugin id'sini paylaşan iki eklentiyi yüklemeyi reddediyor, bu
+çiftler de id'lerini paylaşıyor.
+
+Eklentinin içindeki SpotBugs 4.8.6; `static-scan.sh` ise 4.10.4 kullanıyor.
+Bulgular yakın ama birebir aynı değil, daha yeni çözümleyici CLI'dakidir.
+
+> SpotBugs'ı build'inizde çalıştırın ve yeni bulgularda build'i kırın. IDE
+> eklentisi kod yazarken döndüğünüz döngü için — bir kalite kapısı değil, çünkü
+> yalnızca birinin sağ tıklamayı hatırladığı yeri kapsıyor.
+
+Ayrıntılar: [`plugins/idea/README.tr.md`](plugins/idea/README.tr.md) ve
+[`spotbugs-rule-packs/README.tr.md`](spotbugs-rule-packs/README.tr.md).
+
+---
+
 ## Script referansı
 
 Her script kendi kendini belgeliyor: `-h` ile aynı metni görürsünüz.
@@ -484,12 +573,19 @@ sayı olmayan bir değeri sessizce sıfır saniye profil almak yerine reddediyor
 
 ```bash
 ./scripts/static-scan.sh build/classes src/main/java
+./scripts/static-scan.sh --security build/classes      # + SECURITY kategorisi
+./scripts/static-scan.sh --no-exclude build/classes    # her şeyi raporla
 ```
 
 Bytecode üzerinde SpotBugs (PERFORMANCE, CORRECTNESS, MT_CORRECTNESS), kaynak
-üzerinde PMD (performance + design), ayrıca kopyala-yapıştır tespiti. Ek kural
-paketlerini (`sb-contrib`, `findsecbugs`) `spotbugs-rule-packs/` içine atarsanız
-otomatik yükleniyor.
+üzerinde PMD (performance + design), ayrıca kopyala-yapıştır tespiti.
+
+[`spotbugs-rule-packs/`](spotbugs-rule-packs/) içindeki iki kural paketi ve
+yanlarındaki exclude filtresi otomatik yükleniyor; o klasöre başka jar'lar
+atarsanız onlar da alınıyor. `--categories LISTE` kategori listesini tamamen
+değiştiriyor; `SPOTBUGS_RULE_PACKS`, `SPOTBUGS_CATEGORIES` ve `SPOTBUGS_EXCLUDE`
+ise üç varsayılanı ortamdan eziyor. Bkz.
+[Statik analiz: SpotBugs](#statik-analiz-spotbugs).
 
 Bunlar **aday** bulur, kanıt değil. Bir şeyi değiştirmeden önce profille
 doğrulayın.
@@ -532,7 +628,10 @@ sonuç `$PERF_OUT/jmh/result-<zaman>.json` dosyasına yazılıyor.
 | **MAT** | 1.17.0 | Heap dump analizi, Leak Suspects, dominator tree |
 | **jfr-converter** | pakette | async-profiler olmadan JFR kaydını flame graph'a çevirir |
 | **GCViewer** | 1.37 | GC loglarını görselleştirir |
-| **SpotBugs** | 4.10.4 | Bytecode analizi (performans + doğruluk) |
+| **SpotBugs** | 4.10.4 | Bytecode analizi (performans + doğruluk) — 518 desen |
+| **sb-contrib** | 7.6.9 | SpotBugs kural paketi: 319 desen daha, 43'ü PERFORMANCE |
+| **Find Security Bugs** | 1.14.0 | SpotBugs kural paketi: 144 SECURITY deseni (`--security`) |
+| **IDEA için SpotBugs** | 1.2.8 | Aynı analiz IntelliJ içinde, offline kurulabilir |
 | **PMD / CPD** | 7.27.0 | Kaynak analizi ve kopyala-yapıştır tespiti |
 | **JaCoCo** | 0.8.15 | Kapsam — hangi kodun gerçekten çalıştığını bilmek için |
 | **JMH** | 1.37 | JIT oyunlarına dayanan mikrobenchmark'lar |
@@ -707,7 +806,10 @@ java-profiling-tools/
 ├── jdk/                     JDK 21 arşivi (parçalı)
 ├── runtime/                 async-profiler, JMC, MAT, VisualVM, GCViewer, jfr-converter
 ├── compile-time/            SpotBugs, PMD (parçalı), JaCoCo, JOL
-├── plugins/visualvm/        21 .nbm modülü, 00-setup.sh tarafından offline kuruluyor
+├── plugins/
+│   ├── visualvm/            21 .nbm modülü, 00-setup.sh tarafından offline kuruluyor
+│   └── idea/                IntelliJ IDEA için SpotBugs eklentisi
+├── spotbugs-rule-packs/     sb-contrib + findsecbugs ve exclude filtresi
 ├── jmh/                     JMH jar'ları, bir çalıştırıcı ve örnek benchmark
 ├── docs/                    ekran görüntüleri ve nasıl üretildikleri
 ├── tools/                   00-setup.sh üretiyor  (git'te yok)
@@ -749,5 +851,5 @@ sha256sum -c SHA256SUMS.txt
 Bu depodaki script'ler ve dokümantasyon [`LICENSE`](LICENSE) dosyasındaki
 koşullarla dağıtılıyor. Paketlenmiş üçüncü parti araçlar kendi lisanslarını
 koruyor — GPLv2+CE (OpenJDK, VisualVM), EPL (JMC, MAT, JaCoCo), Apache 2.0
-(async-profiler, PMD, JMH, JOL), LGPL (SpotBugs) — ve lisans dosyaları kendi
-arşivlerinin içinde geliyor.
+(async-profiler, PMD, JMH, JOL), LGPL (SpotBugs ve IDEA eklentisi, sb-contrib,
+Find Security Bugs) — ve lisans dosyaları kendi arşivlerinin içinde geliyor.
