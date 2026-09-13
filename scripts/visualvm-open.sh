@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+#
+# visualvm-open.sh - Opens VisualVM with its plugins ALREADY INSTALLED.
+#
+# WHY THIS SCRIPT EXISTS
+#   1) VisualVM does NOT ship VisualGC, MBeans, Buffer Monitor, Threads
+#      Inspector, Startup Profiler or Tracer. Each one is a separate plugin,
+#      normally downloaded through "Tools -> Plugins". Since there is no
+#      internet, the .nbm files live in the package and 00-setup.sh unpacks
+#      them into a cluster under tools/visualvm-plugins/. This script hands
+#      that cluster to VisualVM, so the plugins are ENABLED ON FIRST LAUNCH -
+#      no wizard, no restart.
+#
+#   2) It controls which JDK runs VisualVM. BY DEFAULT IT USES THE SYSTEM JDK
+#      (i.e. JDK 11) - deliberately. VisualVM's Sampler and Profiler load an
+#      agent into the target JVM, and running at the same version as the
+#      application you measure is the safest choice. Use --jdk21 to switch to
+#      the bundled JDK 21. (This is the difference from JMC: JMC requires
+#      Java 17+, VisualVM does not.)
+#
+# Usage:
+#   ./visualvm-open.sh                          -> open VisualVM
+#   ./visualvm-open.sh ~/perf-out/heap.hprof    -> open with a heap dump loaded
+#   ./visualvm-open.sh ~/perf-out/recording.jfr -> open with a JFR recording loaded
+#   ./visualvm-open.sh --jdk21                  -> run on the bundled JDK 21
+#   ./visualvm-open.sh --jdk /path/to/jdk       -> run on a specific JDK
+#   ./visualvm-open.sh --clean                  -> reset the userdir (if settings broke)
+#   ./visualvm-open.sh --no-plugins             -> open without wiring in the plugins
+#   ./visualvm-open.sh --accept-license         -> pre-accept the first-run licence prompt
+#   ./visualvm-open.sh --foreground             -> do not detach; stay attached to the terminal
+#   ./visualvm-open.sh --where                  -> open nothing, print the choices
+#
+set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+
+VVM="$TOOLS/visualvm"
+CLUSTER="$TOOLS/visualvm-plugins"
+JDK21=0; JDKSEL=""; CLEAN=0; NOPLUGINS=0; WHERE=0; LICENSE=0; FOREGROUND=0; FILE=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --jdk21)          JDK21=1 ;;
+    --jdk)            JDKSEL="${2:?example: --jdk /usr/lib/jvm/java-11}"; shift ;;
+    --clean)          CLEAN=1 ;;
+    --no-plugins)     NOPLUGINS=1 ;;
+    --accept-license) LICENSE=1 ;;
+    --foreground)     FOREGROUND=1 ;;
+    --where)          WHERE=1 ;;
+    -h|--help)        sed -n '3,32p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    # An unknown FLAG must not be mistaken for a filename - otherwise the error
+    # reads "no such file: --foo", which says nothing about the real mistake.
+    -*)               c_err "unknown option: $1"; sed -n '3,32p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1 ;;
+    *)                FILE="$1" ;;
+  esac
+  shift
+done
+
+if [ ! -x "$VVM/bin/visualvm" ]; then
+  c_err "VisualVM not found: $VVM/bin/visualvm"
+  echo "   Unpack the package first:   ./scripts/00-setup.sh" >&2
+  exit 1
+fi
+
+# --------------------------------------------------------- JDK to run on
+# VisualVM 2.2.1 runs on Java 8+. Since the application being measured is on
+# Java 11, the system JDK is the default choice.
+if [ -n "$JDKSEL" ]; then
+  JDKHOME="$JDKSEL"
+elif [ "$JDK21" = "1" ]; then
+  JDKHOME="$TOOLS/jdk21"
+else
+  JDKHOME=""
+  for cand in "${JAVA_HOME:-/nonexistent}" \
+              "$(command -v java >/dev/null 2>&1 && dirname "$(dirname "$(readlink -f "$(command -v java)")")" || echo /nonexistent)"; do
+    [ -x "$cand/bin/java" ] || continue
+    v=$(java_version "$cand/bin/java" 2>/dev/null || echo 0)
+    if [ "${v:-0}" -ge 8 ] 2>/dev/null; then JDKHOME="$cand"; break; fi
+  done
+  [ -n "$JDKHOME" ] || JDKHOME=$(find_jdk 8 || true)
+fi
+
+if [ -z "$JDKHOME" ] || [ ! -x "$JDKHOME/bin/java" ]; then
+  c_err "No runnable JDK found (Java 8+ required)."
+  list_jdks >&2
+  echo "   To try the bundled JDK 21:  ./scripts/visualvm-open.sh --jdk21" >&2
+  exit 1
+fi
+VER=$(java_version "$JDKHOME/bin/java" 2>/dev/null || echo "?")
+
+# VisualVM needs a JDK, not a JRE (attach + jvmstat come from the tools).
+if [ ! -x "$JDKHOME/bin/jps" ] && [ ! -x "$JDKHOME/bin/jcmd" ]; then
+  c_warn "the selected path looks like a JRE rather than a JDK: $JDKHOME"
+  c_warn "VisualVM may not see running JVMs. Pass the JDK path with --jdk."
+fi
+
+# ---------------------------------------------------------------- userdir
+USERDIR="${VISUALVM_USERDIR:-$PERF_OUT/visualvm-userdir}"
+CACHEDIR="$USERDIR/var/cache"
+[ "$CLEAN" = "1" ] && { c_info "deleting userdir: $USERDIR"; rm -rf "$USERDIR"; }
+mkdir -p "$USERDIR/etc" "$CACHEDIR" "$PERF_OUT/tmp"
+
+# The VisualVM launcher SOURCES <userdir>/etc/visualvm.conf. We set both the JDK
+# and the plugin cluster from there, without touching the installation directory
+# at all. Rewritten on every run so it stays correct if the package is moved.
+EXTRA=""
+if [ "$NOPLUGINS" = "0" ] && [ -d "$CLUSTER/config/Modules" ]; then
+  EXTRA="$CLUSTER"
+fi
+{
+  echo "# generated by visualvm-open.sh - do not edit, it will be overwritten."
+  echo "visualvm_jdkhome=\"$JDKHOME\""
+  [ -n "$EXTRA" ] && echo "visualvm_extraclusters=\"$EXTRA\""
+} > "$USERDIR/etc/visualvm.conf"
+
+PLUGIN_COUNT=0
+[ -n "$EXTRA" ] && PLUGIN_COUNT=$(find "$CLUSTER/config/Modules" -name '*.xml' 2>/dev/null | wc -l)
+
+if [ "$WHERE" = "1" ]; then
+  echo "VisualVM     : $VVM/bin/visualvm"
+  echo "will run with: $JDKHOME  (Java $VER)"
+  echo "userdir      : $USERDIR"
+  echo "plugins      : ${EXTRA:-none}  ($PLUGIN_COUNT modules)"
+  echo "on this system:"; list_jdks
+  exit 0
+fi
+
+# On FIRST LAUNCH VisualVM asks you to accept the GPL licence and waits until you
+# do. The acceptance is recorded in <userdir>/var/license_accepted. Since that is
+# a legal acceptance we do not click it for you - but we do tell you it is coming.
+LICENSE_MARK="$USERDIR/var/license_accepted"
+mkdir -p "$USERDIR/var"
+if [ "$LICENSE" = "1" ] && [ ! -f "$LICENSE_MARK" ]; then
+  : > "$LICENSE_MARK"
+  c_info "licence acceptance recorded (--accept-license): $LICENSE_MARK"
+elif [ ! -f "$LICENSE_MARK" ]; then
+  c_warn "First launch: VisualVM will ask you to accept the GPL licence; no window appears until you do."
+  c_warn "To stop it asking every time: ./scripts/visualvm-open.sh --accept-license"
+fi
+
+if ! has_display; then display_help; exit 1; fi
+
+ARGS=( --userdir "$USERDIR" --cachedir "$CACHEDIR"
+       -J-Djava.io.tmpdir="$PERF_OUT/tmp" )
+if [ -n "$FILE" ]; then
+  if [ ! -f "$FILE" ]; then c_err "no such file: $FILE"; exit 1; fi
+  ARGS+=( --openfile "$(readlink -f "$FILE")" )
+  c_info "file to open: $(readlink -f "$FILE")"
+fi
+
+if [ "$PLUGIN_COUNT" -gt 0 ]; then
+  c_info "starting VisualVM - Java $VER, $PLUGIN_COUNT plugin modules installed"
+else
+  c_info "starting VisualVM - Java $VER (no plugins wired in)"
+  [ "$NOPLUGINS" = "0" ] && c_warn "no plugin cluster found; to install it: ./scripts/00-setup.sh"
+fi
+
+LOG="$PERF_OUT/visualvm-last-run.log"
+if [ "$FOREGROUND" = "1" ]; then
+  "$VVM/bin/visualvm" "${ARGS[@]}" 2>&1 | tee "$LOG"
+  exit "${PIPESTATUS[0]}"
+fi
+
+"$VVM/bin/visualvm" "${ARGS[@]}" > "$LOG" 2>&1 &
+PID=$!
+sleep 3
+if ! kill -0 "$PID" 2>/dev/null; then
+  wait "$PID"; RC=$?
+  c_err "VisualVM did not start (exit code $RC). Log: $LOG"
+  tail -20 "$LOG" >&2
+  exit "$RC"
+fi
+echo "   VisualVM is running in the background (pid $PID). Log: $LOG"
+if [ "$PLUGIN_COUNT" -gt 0 ]; then
+cat <<'DONE'
+
+   Where the bundled plugins show up:
+     Visual GC          select the app -> "Visual GC" tab   (live eden/survivor/old chart)
+     Buffer Pools       tab next to "Monitor"   (direct + mapped ByteBuffer - LOOK HERE FIRST if RSS >> heap)
+     Threads Inspector  "Threads" tab -> current stack of the selected thread
+     MBeans             "MBeans" tab            (read/change settings over JMX)
+     Tracer             "Tracer" tab            (JVM/IO/collection probes, time series)
+     BTrace             right-click the app -> "Trace application..."  (dynamic tracing of a live JVM)
+     Startup Profiler   Applications -> right-click  (measure startup cost)
+     OQL syntax         heap dump -> "OQL Console"  (highlighting + completion)
+DONE
+fi

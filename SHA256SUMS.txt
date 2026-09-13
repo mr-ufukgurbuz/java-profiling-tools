@@ -1,0 +1,45 @@
+# SHA-256 checksums for every bundled archive.
+# Verify with:  sha256sum -c SHA256SUMS.txt
+#
+# NOTE: the split archives (*.z01 + *.zip) are listed as the parts that are
+#       actually committed, not as the joined file. scripts/00-setup.sh joins
+#       them with scripts/zip-join.py before unpacking.
+
+5b3f6ddb724e761d25c937d68b0189a3a23f3e220e3282575ee0b53359e8110e  compile-time/jacoco-0.8.15.zip
+ea8cf31b7dc6c18810ca7aeadcbe7a2b352fb250261b8060ce513e8a99ebcd12  compile-time/jol-cli-0.17-full.jar
+0c1ed7449f3b04d7387276c4db2bcdfda931844d2e3ddb81f1959a3202b3f6df  compile-time/pmd-dist-7.27.0-bin.z01
+42448aa2a3f218470cb4a2ec4ec5baa7b74f89c18033b2eab179a565038118dd  compile-time/pmd-dist-7.27.0-bin.zip
+72bc0d4edd686e462c0f71f42a049b27bf4da6708797ff7b2b56dd202714b4e5  compile-time/spotbugs-4.10.4.tgz
+d5d807541d23ea0180a645ab0f1337e05ec9dcddd0726b1c6f2a8acf99db779b  jdk/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.z01
+5a468f0b5e8b02393a246c48c817088bfe1d9fdd1f2105c8cef510a2f61cdff4  jdk/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.zip
+1e56d7b058d28b65abd256b8458e3885b674c1d588fa43cd7d1cbb9c7ef2b308  jmh/lib/commons-math3-3.6.1.jar
+dc0eaf2bbf0036a70b60798c785d6e03a9daf06b68b8edb0f1ba9eb3421baeb3  jmh/lib/jmh-core-1.37.jar
+6a5604b5b804e0daca1145df1077609321687734a8b49387e49f10557c186c77  jmh/lib/jmh-generator-annprocess-1.37.jar
+df26cc58f235f477db07f753ba5a3ab243ebe5789d9f89ecf68dd62ea9a66c28  jmh/lib/jopt-simple-5.0.4.jar
+40ab4769979440fa8a0248224dd7dead7c3643fbb5a8db601de64fb5e3f3e6a9  plugins/visualvm/jsyntaxpane-lib.nbm
+50aa92bc69f51f0cf7673b1e8dd5b70fb34508eedfdcb4e8ffbac0969d8dfaf6  plugins/visualvm/org-graalvm-visualvm-modules-buffermonitor.nbm
+7c74d748dd907dd48dc281c185f7722a2b9f539349c1cd64cc0e578774bea931  plugins/visualvm/org-graalvm-visualvm-modules-extensions.nbm
+fe53c3d1309e945000c81700066f32846336e7be4ded55cc0053ad6dad198e0d  plugins/visualvm/org-graalvm-visualvm-modules-jconsole.nbm
+4df6c89ba9d99e1afb72b8e8af5f152b183c317d2828deacac79ca88ba672e61  plugins/visualvm/org-graalvm-visualvm-modules-mbeans.nbm
+09cdeb386c52684afaa7af52e17d941aa73e3115862facfb9c2dfa0676427cf3  plugins/visualvm/org-graalvm-visualvm-modules-oqlsyntax.nbm
+eafc0ab8e50d80bc9bece0c7657bf881abeb73d3e9bb3dfa5543c65030499d28  plugins/visualvm/org-graalvm-visualvm-modules-security.nbm
+63575aeb98fbb968f46759f14853017f896ac4e13737d0fa33cabde8ab316c28  plugins/visualvm/org-graalvm-visualvm-modules-threadinspect.nbm
+92ba55d9c61799a6d8bf00add79787606a2d05e7185ab83124a6d9336fe2e452  plugins/visualvm/org-graalvm-visualvm-modules-tracer-collections.nbm
+8e116ea5e8b8979e6e5e62a6e6014adc0ca2568f45522a674d0c5a989b590b55  plugins/visualvm/org-graalvm-visualvm-modules-tracer-dynamic.nbm
+53e43defa14d294d96ffad31d25bca0ae7917b379b44bc9aad9fd6b4d808f934  plugins/visualvm/org-graalvm-visualvm-modules-tracer-io.nbm
+9b16053955e0c7f4c4bee9086de7f7fa654394b9673e7d4d5abe893f0aee649e  plugins/visualvm/org-graalvm-visualvm-modules-tracer-jvm.nbm
+a43db4a92b2b7343583943925b1cf0d7d531cb42e3c67ecbad75d81e0bc3b4ad  plugins/visualvm/org-graalvm-visualvm-modules-tracer-jvmstat.nbm
+7acef10b02c9008e82a98e057ee4c73808a40c178957cdb03c8d6693b3e3f4ea  plugins/visualvm/org-graalvm-visualvm-modules-tracer-monitor.nbm
+22ec181a219fc1c11933bc6e786c5e9e47c4b6e719f2ce44b05714b86cfe5c59  plugins/visualvm/org-graalvm-visualvm-modules-tracer-swing.nbm
+9a7716b4eb9152761b075af1b467c30df0883598b0e9f1a6a2419b250adeada4  plugins/visualvm/org-graalvm-visualvm-modules-tracer.nbm
+f8354d44caee74ed36119bc99a31d5d37d3b2e3469610bd0c713238eb03fd443  plugins/visualvm/org-graalvm-visualvm-modules-visualgc.nbm
+f2d270460766e68d023bbd8952ecebf4aec7962ff4dfdc32bc0013b4b71c4d07  plugins/visualvm/org-graalvm-visualvm-profiler-startup.nbm
+90d3b94165b7a5d662f640b2378cf9fccf5fc975bb5df2faac93089d085bc6eb  plugins/visualvm/org-openjdk-btrace-visualvm-api.nbm
+a6b28e1c3303928f20173ff4ca81c249aa5b8304fc9e7b2f6cd503cbb8800bad  plugins/visualvm/org-openjdk-btrace-visualvm-tracer-deployer.nbm
+bd7d9069a0c6835574ada276553c8a358190009356fd7e59a8bafa2302ab91d0  plugins/visualvm/org-openjdk-btrace-visualvm.nbm
+e1ea80a7984d411e4c4d7dfbab092da9255f7b772d681a256a61049bcc883767  runtime/MemoryAnalyzer-1.17.0.20260601-linux.gtk.x86_64.zip
+89546fbb9ee0fc5496c7edd4099b0709489bc78b0d8057ccbb4b801f6b032b62  runtime/async-profiler-4.5-linux-x64.tar.gz
+325a5f1a8f67588b6845c71eceb70c8b74c45930fd553ba2fc7b3b4118608e13  runtime/gcviewer-1.37.jar
+41a3b07cd73a8f800814856a622449530f645662d5b274fbd040f1a82b032aee  runtime/jfr-converter.jar
+3085244b8f32bbd0646c8109a9f65f7089497e07e1d6bbc62f64da942d27d748  runtime/org.openjdk.jmc-9.1.2-linux.gtk.x86_64.tar.gz
+6884c908c9e10a959dea8e7b168b496515c0310d6b86a35ce96b8197231f4ef3  runtime/visualvm_221.zip
