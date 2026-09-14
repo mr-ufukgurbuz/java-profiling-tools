@@ -19,10 +19,10 @@
 
   <!-- shared configuration band -->
   <rect x="40" y="78" width="800" height="112" rx="6" fill="#f2f6fa" stroke="#c3d4e4"/>
-  <text x="56" y="98" font-size="11" font-weight="600" fill="#3a6ea5" letter-spacing="0.6">SHARED CONFIGURATION — VERSIONED IN THIS REPOSITORY</text>
+  <text x="56" y="98" font-size="11" font-weight="600" fill="#3a6ea5" letter-spacing="0.6">SHARED CONFIGURATION — VERSIONED HERE, UNPACKED BY 00-setup.sh</text>
 
   <rect x="56" y="108" width="380" height="68" rx="5" fill="#ffffff" stroke="#c3d4e4"/>
-  <text x="70" y="127" font-size="12.5" font-weight="600" fill="#1a1a19">spotbugs-rule-packs/</text>
+  <text x="70" y="127" font-size="12.5" font-weight="600" fill="#1a1a19">tools/spotbugs-rule-packs/</text>
   <text x="70" y="145" font-size="11.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#44443f">sb-contrib 7.6.9 · findsecbugs 1.14.0</text>
   <text x="70" y="163" font-size="11.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#44443f">spotbugs-exclude.xml</text>
 

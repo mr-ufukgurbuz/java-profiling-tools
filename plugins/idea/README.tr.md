@@ -9,7 +9,7 @@ analiz, editöre taşınmış hâli: sınıfa sağ tıklıyorsunuz, bulgular kod
 
 | | [SpotBugs][sb] | [PMD][pmd] |
 |---|---|---|
-| Dosya | `spotbugs-idea-1.2.8.zip` | `PMDPlugin-2.1.0.zip` |
+| Dosya (`tools/idea-plugins/` içinde) | `spotbugs-idea-1.2.8.zip` | `PMDPlugin-2.1.0.zip` |
 | Plugin id | `org.jetbrains.plugins.spotbugs` | `PMDPlugin` |
 | Gereksinim | IDEA build `222.1`+ (2022.2'den itibaren) | IDEA build `241`+ (2024.1'den itibaren) |
 | Neye bakıyor | **bytecode** | **kaynak** |
@@ -24,9 +24,19 @@ güncel — hiçbiri `until-build` bildirmiyor.
 
 ## Kurulum
 
-`Settings → Plugins → ⚙ → Install Plugin from Disk…`, bir zip'i seçin, diğeri
-için tekrarlayın, sonra **bir kez** yeniden başlatın. Marketplace'e hiçbir
-bağlantı denenmiyor.
+Eklentiler burada `idea-plugins.tar.xz` olarak duruyor: bazı git sunucuları
+`.zip` yüklemesini reddediyor, o yüzden iki eklenti zip'i tek arşivin içinde
+taşınıyor. Önce açın — `tools/idea-plugins/` altına düşüyorlar:
+
+```bash
+./scripts/00-setup.sh          # ya da tek basina:
+tar -xJf plugins/idea/idea-plugins.tar.xz -C /tmp
+```
+
+Sonra `Settings → Plugins → ⚙ → Install Plugin from Disk…`, bir zip'i seçin,
+diğeri için tekrarlayın, sonra **bir kez** yeniden başlatın. Marketplace'e
+hiçbir bağlantı denenmiyor. `.zip` biçimi bilerek korundu: *Install Plugin
+from Disk* bunu bekliyor.
 
 Ekip için, zip'leri iç ağdaki bir web sunucusundan `updatePlugins.xml` ile
 sunmak yirmi kişinin tek tek diskten kurmasından iyidir — eklentiler o zaman
@@ -78,8 +88,9 @@ Eklenti kural paketlerinin kendi kopyalarıyla geliyor ve bunlar
 | `AndroidFindbugs_0.5` | — |
 
 `Settings → Tools → SpotBugs → Plugins → +` ile `sb-contrib-7.6.9.jar` ve
-`findsecbugs-plugin-1.14.0.jar` dosyalarını diskten ekleyin **ve her birinin
-gömülü kopyasını devre dışı bırakın.**
+`findsecbugs-plugin-1.14.0.jar` dosyalarını `tools/spotbugs-rule-packs/`
+altından ekleyin (`.tar.xz` olarak commit'leniyorlar, `00-setup.sh` oraya
+açıyor) **ve her birinin gömülü kopyasını devre dışı bırakın.**
 
 > Devre dışı bırakmak isteğe bağlı değil. SpotBugs aynı plugin id'sine sahip
 > iki eklentiyi yüklemeyi reddediyor ve bu çiftler id'lerini paylaşıyor —

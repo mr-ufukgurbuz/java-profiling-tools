@@ -7,15 +7,20 @@ Buradaki iki jar 463 desen daha ekliyor. Bunlar IntelliJ eklentisi **değil** ve
 `00-setup.sh` bunları açmıyor — düz SpotBugs *plugin jar*'ları; iki şekilde
 yükleniyorlar:
 
+Jar'lar burada açıkta değil, `spotbugs-rule-packs.tar.xz` içinde tutuluyor —
+bazı git sunucuları `.jar` yüklemesini doğrudan reddediyor. `00-setup.sh`
+bunları `tools/spotbugs-rule-packs/` altına açıyor; iki tüketici de oraya
+bakıyor:
+
 - **Komut satırından** — [`scripts/static-scan.sh`](../scripts/static-scan.sh)
-  bu klasördeki her `.jar`'ı bulup SpotBugs'a `-pluginList` ile veriyor.
-  Yapılandırma gerekmiyor.
-- **IntelliJ IDEA'dan** — `Settings → Tools → SpotBugs → Plugins → +` ile bu
+  `tools/spotbugs-rule-packs/` içindeki her `.jar`'ı bulup SpotBugs'a
+  `-pluginList` ile veriyor. Yapılandırma gerekmiyor.
+- **IntelliJ IDEA'dan** — `Settings → Tools → SpotBugs → Plugins → +` ile o
   jar'ları diskten seçiyorsunuz. Bkz. [`plugins/idea/`](../plugins/idea/).
 
 ## İçerik
 
-| Jar | Plugin id | Desen | Dedektör |
+| Jar (kurulumdan sonra `tools/spotbugs-rule-packs/`) | Plugin id | Desen | Dedektör |
 |---|---|---|---|
 | `sb-contrib-7.6.9.jar` | `com.mebigfatguy.fbcontrib` | 319 | 153 |
 | `findsecbugs-plugin-1.14.0.jar` | `com.h3xstream.findsecbugs` | 144 | 121 |
@@ -88,8 +93,10 @@ on dakikanıza değer.
 
 ## Yeni paket ekleme
 
-Jar'ı bu klasöre bırakın. `static-scan.sh` buradaki her `.jar`'ı alıyor,
-`00-setup.sh --verify` de sayıyor.
+Jar'ı `spotbugs-rule-packs.tar.xz` içine ekleyin (tek seferlik deneme için
+doğrudan `tools/spotbugs-rule-packs/` altına da atabilirsiniz). `static-scan.sh`
+o klasördeki her `.jar`'ı alıyor, `00-setup.sh --verify` de sayıyor. Açıkta
+`.jar` commit'lemeyin — depo README'sindeki arşiv bölümüne bakın.
 
 Tek kural: **SpotBugs aynı plugin id'sine sahip iki eklentiyi yüklemeyi
 reddediyor.** Id'ler yukarıdaki tabloda. sb-contrib'in ikinci bir kopyasını
@@ -104,7 +111,7 @@ otorite **build** olmalı ve aynı iki jar'ı kullanmalı. SpotBugs bunları
 
 ```bash
 spotbugs -textui -effort:max -low \
-    -pluginList spotbugs-rule-packs/sb-contrib-7.6.9.jar:spotbugs-rule-packs/findsecbugs-plugin-1.14.0.jar \
+    -pluginList tools/spotbugs-rule-packs/sb-contrib-7.6.9.jar:tools/spotbugs-rule-packs/findsecbugs-plugin-1.14.0.jar \
     -exclude spotbugs-rule-packs/spotbugs-exclude.xml \
     -auxclasspath "$(cat compile.classpath)" \
     -xml:withMessages -output build/reports/spotbugs.xml \
@@ -124,7 +131,7 @@ koordinatlara değil, diskteki jar'lara yönlendirin:
         <failOnError>true</failOnError>
         <excludeFilterFile>spotbugs-rule-packs/spotbugs-exclude.xml</excludeFilterFile>
         <pluginList>
-            spotbugs-rule-packs/sb-contrib-7.6.9.jar,spotbugs-rule-packs/findsecbugs-plugin-1.14.0.jar
+            tools/spotbugs-rule-packs/sb-contrib-7.6.9.jar,tools/spotbugs-rule-packs/findsecbugs-plugin-1.14.0.jar
         </pluginList>
     </configuration>
 </plugin>

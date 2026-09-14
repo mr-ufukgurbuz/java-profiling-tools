@@ -793,7 +793,7 @@ JFRTOOL="${JFRCLI:-}"; [ -x "${JFRTOOL:-/nonexistent}" ] || JFRTOOL=$(pick jfr)
 # With no async-profiler we build the flame graph out of the JFR recording instead.
 # The bundled jfr-converter.jar exists exactly for this.
 if [ -n "${JFRF:-}" ] && [ -s "${JFRF:-/nonexistent}" ] && [ ! -s "$OUT/cpu.html" ]; then
-  JFRCONV="${JFRCONV:-$PROFILING_HOME/runtime/jfr-converter.jar}"
+  JFRCONV="${JFRCONV:-$PROFILING_HOME/tools/jfr-converter/jfr-converter.jar}"
   JAVABIN=$(pick java)
   if [ -f "$JFRCONV" ] && [ -n "$JAVABIN" ]; then
     echo "  Building a flame graph from the JFR recording (jfr-converter)..."

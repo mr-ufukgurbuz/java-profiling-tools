@@ -8,7 +8,7 @@ analysis, moved into the editor: right-click a class, get the findings inline.
 
 | | [SpotBugs][sb] | [PMD][pmd] |
 |---|---|---|
-| File | `spotbugs-idea-1.2.8.zip` | `PMDPlugin-2.1.0.zip` |
+| File (in `tools/idea-plugins/`) | `spotbugs-idea-1.2.8.zip` | `PMDPlugin-2.1.0.zip` |
 | Plugin id | `org.jetbrains.plugins.spotbugs` | `PMDPlugin` |
 | Requires | IDEA build `222.1`+ (2022.2 onwards) | IDEA build `241`+ (2024.1 onwards) |
 | Reads | **bytecode** | **source** |
@@ -23,8 +23,19 @@ declares an `until-build`.
 
 ## Install
 
-`Settings → Plugins → ⚙ → Install Plugin from Disk…`, pick a zip, repeat for the
-other, then restart once. No Marketplace connection is attempted.
+The plugins are committed here as `idea-plugins.tar.xz`: some git hosts reject
+`.zip` uploads, so the two plugin zips travel inside one archive. Unpack them
+first — they land in `tools/idea-plugins/`:
+
+```bash
+./scripts/00-setup.sh          # or, on its own:
+tar -xJf plugins/idea/idea-plugins.tar.xz -C /tmp
+```
+
+Then `Settings → Plugins → ⚙ → Install Plugin from Disk…`, pick a zip, repeat
+for the other, then restart once. No Marketplace connection is attempted. The
+`.zip` form is kept deliberately: that is what *Install Plugin from Disk*
+expects.
 
 For a team, serving the zips from an internal web server with an
 `updatePlugins.xml` beats twenty people installing from disk — plugins then show
@@ -74,9 +85,10 @@ the ones in [`spotbugs-rule-packs/`](../../spotbugs-rule-packs/):
 | `findsecbugs-plugin-1.12.0` | `findsecbugs-plugin-1.14.0` |
 | `AndroidFindbugs_0.5` | — |
 
-`Settings → Tools → SpotBugs → Plugins → +`, add
-`sb-contrib-7.6.9.jar` and `findsecbugs-plugin-1.14.0.jar` from disk, **and
-disable the bundled copy of each one.**
+`Settings → Tools → SpotBugs → Plugins → +`, add `sb-contrib-7.6.9.jar` and
+`findsecbugs-plugin-1.14.0.jar` from `tools/spotbugs-rule-packs/` (they are
+committed as a `.tar.xz` and unpacked there by `00-setup.sh`), **and disable the
+bundled copy of each one.**
 
 > Disabling is not optional. SpotBugs refuses to load two plugins with the same
 > plugin id, and these pairs share theirs — `com.mebigfatguy.fbcontrib` and

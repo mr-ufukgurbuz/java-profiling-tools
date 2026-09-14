@@ -44,7 +44,7 @@ is costing you, and what to do about it.
 - [Script reference](#script-reference)
 - [Tool reference](#tool-reference)
 - [Reading the output](#reading-the-output)
-- [Split archives](#split-archives)
+- [Archives, and the two that are split](#archives-and-the-two-that-are-split)
 - [Writing policy: `$HOME` only](#writing-policy-home-only)
 - [Repository layout](#repository-layout)
 - [Troubleshooting](#troubleshooting)
@@ -91,7 +91,10 @@ cd ~/java-profiling-tools
 
 That single script unpacks every archive into `tools/`, joins the split ones,
 points JMC and MAT at the bundled JDK 21, raises MAT's heap to half of machine
-RAM, installs the 21 VisualVM plugins, and finishes with a verification table:
+RAM, installs the 21 VisualVM plugins, and finishes with a verification table.
+It is also what puts the bundled **jars** on disk — JOL, GCViewer,
+jfr-converter, the JMH libraries and the SpotBugs rule packs are committed
+inside `.tar.xz` archives, never loose, so nothing works until it has run:
 
 ![00-setup.sh --verify](docs/images/01-setup-verification.png)
 
@@ -444,9 +447,10 @@ PMD_RULESET= ./scripts/static-scan.sh build/classes   # PMD's own categories
 ### Both of them inside IntelliJ IDEA
 
 [`plugins/idea/`](plugins/idea/) holds both plugins, bundled so they install
-with no internet — `Settings → Plugins → ⚙ → Install Plugin from Disk…`:
+with no internet. Run `./scripts/00-setup.sh` first — it unpacks them to
+`tools/idea-plugins/` — then `Settings → Plugins → ⚙ → Install Plugin from Disk…`:
 
-| Plugin | Needs | Bundled engine | Settings page |
+| Plugin (in `tools/idea-plugins/`) | Needs | Bundled engine | Settings page |
 |---|---|---|---|
 | `spotbugs-idea-1.2.8.zip` | IDEA 2022.2+ | SpotBugs 4.8.6 | `Settings → Tools → SpotBugs` |
 | `PMDPlugin-2.1.0.zip` | IDEA 2024.1+ | PMD 7.21.0 | `Settings → Tools → PMD` |
@@ -457,9 +461,10 @@ longer match. Set `Effort: Max` and `Minimum confidence: Medium`.
 
 Two steps make the IDE run the same rules as the build. For PMD, add the shared
 ruleset above. For SpotBugs, add `sb-contrib-7.6.9.jar` and
-`findsecbugs-plugin-1.14.0.jar` under `Plugins → +` — and **disable the older
-copies the plugin bundles**, because SpotBugs refuses to load two plugins
-sharing a plugin id and these pairs share theirs.
+`findsecbugs-plugin-1.14.0.jar` — both in `tools/spotbugs-rule-packs/` after
+setup — under `Plugins → +`, and **disable the older copies the plugin
+bundles**, because SpotBugs refuses to load two plugins sharing a plugin id and
+these pairs share theirs.
 
 ![Two steps to align the IDE with the build](docs/images/14-ide-setup-steps.svg)
 
@@ -615,14 +620,6 @@ picked up too. `--categories LIST` replaces the category list outright, and
 These find **candidates**, not proof. Confirm with a profile before changing
 anything.
 
-### `scripts/zip-join.py` — split-archive joiner
-
-```bash
-python3 scripts/zip-join.py big.zip joined.zip
-```
-
-Called automatically by `00-setup.sh`. See [Split archives](#split-archives).
-
 ### `scripts/common.sh` — shared helpers
 
 Sourced by the other scripts, not run directly: finding a JDK of at least a
@@ -764,31 +761,57 @@ A sample of what it recognises and what it tells you to do:
 
 ---
 
-## Split archives
+## Archives, and the two that are split
 
-GitHub rejects files over 100 MB, so the three large archives are split with
-`zip -s`:
+Nothing in this repository is committed as `.zip` or `.jar`. Some git hosts —
+Bitbucket among them — refuse those types outright, so every bundled tool
+travels as `.tar.xz` (or the `.tar.gz`/`.tgz` it already shipped as):
 
 ```
-jdk/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.z01   (100 MB)
-jdk/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.zip   (the LAST part)
-compile-time/pmd-dist-7.27.0-bin.z01
-compile-time/pmd-dist-7.27.0-bin.zip
+compile-time/jacoco-0.8.15.tar.xz            runtime/visualvm_221.tar.xz
+compile-time/jol-cli-0.17-full.tar.xz        runtime/gcviewer-1.37.tar.xz
+jmh/lib/jmh-libs.tar.xz                      runtime/jfr-converter.tar.xz
+spotbugs-rule-packs/spotbugs-rule-packs.tar.xz
+plugins/idea/idea-plugins.tar.xz
 ```
 
-**`cat` will not join them.** In a split zip, every central-directory offset is
-written relative to its own part, so a naive concatenation makes `unzip` report
-*"overlapped components"* and `jar` report *"invalid LOC header"*. That is why
-[`scripts/zip-join.py`](scripts/zip-join.py) exists: it concatenates the parts
-**and rewrites the offsets** to be absolute.
+That is also why **no jar sits loose in a directory**. The jars this toolkit
+needs — JOL, GCViewer, jfr-converter, the four JMH libraries, the two SpotBugs
+rule packs — are inside those archives, and `00-setup.sh` unpacks them into
+`tools/`, which is where every script looks for them. The IntelliJ plugins keep
+their `.zip` form *inside* `idea-plugins.tar.xz`, because that is what
+*Install Plugin from Disk* expects; after setup they are in
+`tools/idea-plugins/`.
 
-`00-setup.sh` calls it automatically. If you would rather use the `zip` tool:
+Two archives are still larger than the 100 MB a git host will take, so they are
+committed as numbered byte ranges:
+
+```
+jdk/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.xz.part00   (90 MB)
+jdk/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.xz.part01   (79 MB)
+compile-time/pmd-dist-7.27.0-bin.tar.xz.part00                   (90 MB)
+compile-time/pmd-dist-7.27.0-bin.tar.xz.part01                   (33 MB)
+```
+
+These are plain `split -b` byte ranges of one file, so joining them is just
+`cat` — no offset rewriting, no helper script:
 
 ```bash
-zip -s 0 compile-time/pmd-dist-7.27.0-bin.zip --out /tmp/pmd-joined.zip
+cat compile-time/pmd-dist-7.27.0-bin.tar.xz.part* > /tmp/pmd.tar.xz
+tar -xJf /tmp/pmd.tar.xz
 ```
 
-Do not commit new tool archives without splitting them the same way.
+`00-setup.sh` does this for you. (The old layout used split **zips**, where
+every central-directory offset is written relative to its own part, so `cat`
+produced *"overlapped components"* and a `zip-join.py` helper had to rewrite
+the offsets. Moving to `.tar.xz` removed both the helper and that failure mode.)
+
+To add a tool archive of your own:
+
+```bash
+tar -C <extracted-dir> --owner=0 --group=0 --numeric-owner -cf - . | xz -T0 -6 > tool.tar.xz
+split -b 90M -d -a 2 tool.tar.xz tool.tar.xz.part && rm tool.tar.xz   # only if >100 MB
+```
 
 ---
 
@@ -826,9 +849,8 @@ java-profiling-tools/
 │   ├── jfr-summary.sh       decode a recording in the terminal
 │   ├── cpu-profile.sh       CPU flame graph
 │   ├── memory-profile.sh    allocation flame graph
-│   ├── static-scan.sh       SpotBugs + PMD + CPD
-│   └── zip-join.py          split-archive joiner
-├── jdk/                     JDK 21 archive (split)
+│   └── static-scan.sh       SpotBugs + PMD + CPD
+├── jdk/                     JDK 21 archive (.tar.xz, split into parts)
 ├── runtime/                 async-profiler, JMC, MAT, VisualVM, GCViewer, jfr-converter
 ├── compile-time/            SpotBugs, PMD (split), JaCoCo, JOL
 ├── plugins/
@@ -836,9 +858,10 @@ java-profiling-tools/
 │   └── idea/                SpotBugs + PMD plugins for IntelliJ IDEA
 ├── spotbugs-rule-packs/     sb-contrib + findsecbugs, and the exclude filter
 ├── pmd-rulesets/            the PMD ruleset shared by the CLI and the IDE
-├── jmh/                     JMH jars, a runner, and an example benchmark
+├── jmh/                     JMH jars (archived), a runner, and an example benchmark
 ├── docs/                    screenshots, and how they were made
-├── tools/                   created by 00-setup.sh  (git-ignored)
+├── tools/                   created by 00-setup.sh  (git-ignored) — every jar
+│                            and the IDEA plugin zips land here
 └── SHA256SUMS.txt           checksums for every bundled archive
 ```
 
@@ -855,7 +878,7 @@ java-profiling-tools/
 | VisualVM starts but the tabs are missing | You launched `tools/visualvm/bin/visualvm` directly; it does not know about the cluster. Use `visualvm-open.sh`. |
 | async-profiler: *"Perf events unavailable"* | `perf_event_paranoid > 1`. The scripts fall back to `ctimer` automatically. |
 | A profiling session seems stuck | `asprof stop <pid>` — killing the asprof process does not detach the agent. |
-| `unzip: overlapped components` | You joined a split archive with `cat`. Use `scripts/zip-join.py`. |
+| `JMH jars not found in …` / `JOL` unset | `tools/` is not populated. The jars ship inside `.tar.xz`; run `./scripts/00-setup.sh`. |
 | MAT runs out of memory on a dump | Raise `-Xmx` in `tools/mat/MemoryAnalyzer.ini` to at least half the dump size. |
 | An empty flame graph | The app was idle, or the window was too short. Measure under load, with `--duration 180`. |
 | The report blames a JDK method you never call | Look at the `your code:` line under it — that is the first frame in your package. |
@@ -864,7 +887,8 @@ java-profiling-tools/
 
 ## Verifying the downloads
 
-Every bundled archive is listed in [`SHA256SUMS.txt`](SHA256SUMS.txt):
+Every bundled archive is listed in [`SHA256SUMS.txt`](SHA256SUMS.txt) — the
+split ones as the parts that are actually committed:
 
 ```bash
 sha256sum -c SHA256SUMS.txt

@@ -43,7 +43,7 @@ ne yapmanız gerektiğini söyleyen bir rapor basıyor.
 - [Script referansı](#script-referansı)
 - [Araç referansı](#araç-referansı)
 - [Çıktıyı okumak](#çıktıyı-okumak)
-- [Parçalı arşivler](#parçalı-arşivler)
+- [Arşivler ve parçalanan iki tanesi](#arşivler-ve-parçalanan-iki-tanesi)
 - [Yazma kısıtı: sadece `$HOME`](#yazma-kısıtı-sadece-home)
 - [Depo yapısı](#depo-yapısı)
 - [Sorun giderme](#sorun-giderme)
@@ -94,7 +94,10 @@ cd ~/java-profiling-tools
 Bu tek script bütün arşivleri `tools/` içine açıyor, parçalı olanları
 birleştiriyor, JMC ve MAT'ı paketteki JDK 21'e sabitliyor, MAT'ın heap'ini
 makine RAM'inin yarısına çıkarıyor, 21 VisualVM eklentisini kuruyor ve bir
-doğrulama tablosuyla bitiyor:
+doğrulama tablosuyla bitiyor. Paketteki **jar'lar** da bu script ile diske
+geliyor: JOL, GCViewer, jfr-converter, JMH kütüphaneleri ve SpotBugs kural
+paketleri `.tar.xz` içinde tutuluyor, açıkta değil — yani bu script çalışmadan
+hiçbiri ortada yok:
 
 ![00-setup.sh --verify](docs/images/01-setup-verification.png)
 
@@ -453,10 +456,11 @@ PMD_RULESET= ./scripts/static-scan.sh build/classes   # PMD'nin kendi kategorile
 ### İkisi de IntelliJ IDEA içinde
 
 [`plugins/idea/`](plugins/idea/) iki eklentiyi de tutuyor; internetsiz
-kurulabilsinler diye paketlendiler —
+kurulabilsinler diye paketlendiler. Önce `./scripts/00-setup.sh` çalıştırın —
+eklentileri `tools/idea-plugins/` altına açıyor — sonra
 `Settings → Plugins → ⚙ → Install Plugin from Disk…`:
 
-| Eklenti | Gereksinim | İçindeki motor | Ayar sayfası |
+| Eklenti (`tools/idea-plugins/` içinde) | Gereksinim | İçindeki motor | Ayar sayfası |
 |---|---|---|---|
 | `spotbugs-idea-1.2.8.zip` | IDEA 2022.2+ | SpotBugs 4.8.6 | `Settings → Tools → SpotBugs` |
 | `PMDPlugin-2.1.0.zip` | IDEA 2024.1+ | PMD 7.21.0 | `Settings → Tools → PMD` |
@@ -467,7 +471,8 @@ alırsınız. `Effort: Max` ve `Minimum confidence: Medium` yapın.
 
 IDE'nin build ile aynı kuralları çalıştırması iki adım istiyor. PMD için
 yukarıdaki paylaşılan ruleset'i ekleyin. SpotBugs için `Plugins → +` altına
-`sb-contrib-7.6.9.jar` ve `findsecbugs-plugin-1.14.0.jar` ekleyin — **ve
+`sb-contrib-7.6.9.jar` ve `findsecbugs-plugin-1.14.0.jar` ekleyin (kurulumdan
+sonra ikisi de `tools/spotbugs-rule-packs/` altında) — **ve
 eklentinin getirdiği eski kopyaları devre dışı bırakın**, çünkü SpotBugs aynı
 plugin id'sini paylaşan iki eklentiyi yüklemeyi reddediyor, bu çiftler de
 id'lerini paylaşıyor.
@@ -629,15 +634,6 @@ alınıyor. `--categories LISTE` kategori listesini tamamen değiştiriyor;
 Bunlar **aday** bulur, kanıt değil. Bir şeyi değiştirmeden önce profille
 doğrulayın.
 
-### `scripts/zip-join.py` — parçalı arşiv birleştirici
-
-```bash
-python3 scripts/zip-join.py buyuk.zip birlesik.zip
-```
-
-`00-setup.sh` tarafından otomatik çağrılıyor.
-[Parçalı arşivler](#parçalı-arşivler) bölümüne bakın.
-
 ### `scripts/common.sh` — paylaşılan yardımcılar
 
 Diğer script'ler tarafından `source` ediliyor, doğrudan çalıştırılmıyor: belirli
@@ -778,31 +774,57 @@ Tanıdıklarından ve ne söylediğinden bir örnek:
 
 ---
 
-## Parçalı arşivler
+## Arşivler ve parçalanan iki tanesi
 
-GitHub 100 MB üzerindeki dosyaları kabul etmiyor, bu yüzden üç büyük arşiv
-`zip -s` ile parçalandı:
+Bu depoda hiçbir şey `.zip` veya `.jar` olarak tutulmuyor. Bazı git sunucuları
+— Bitbucket dahil — bu türleri doğrudan reddediyor, o yüzden paketteki her araç
+`.tar.xz` olarak (ya da zaten geldiği `.tar.gz`/`.tgz` biçiminde) taşınıyor:
 
 ```
-jdk/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.z01   (100 MB)
-jdk/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.zip   (SON parça)
-compile-time/pmd-dist-7.27.0-bin.z01
-compile-time/pmd-dist-7.27.0-bin.zip
+compile-time/jacoco-0.8.15.tar.xz            runtime/visualvm_221.tar.xz
+compile-time/jol-cli-0.17-full.tar.xz        runtime/gcviewer-1.37.tar.xz
+jmh/lib/jmh-libs.tar.xz                      runtime/jfr-converter.tar.xz
+spotbugs-rule-packs/spotbugs-rule-packs.tar.xz
+plugins/idea/idea-plugins.tar.xz
 ```
 
-**`cat` bunları birleştirmez.** Parçalı bir zip'te her merkezi dizin ofseti
-kendi parçasına göre yazılır; düz birleştirme sonucunda `unzip`
-*"overlapped components"*, `jar` ise *"invalid LOC header"* der. Bu yüzden
-[`scripts/zip-join.py`](scripts/zip-join.py) var: parçaları birleştiriyor **ve
-ofsetleri mutlak hale getiriyor**.
+**Hiçbir jar da klasörde açıkta durmuyor** — sebebi bu. Bu paketin ihtiyaç
+duyduğu jar'lar (JOL, GCViewer, jfr-converter, dört JMH kütüphanesi, iki
+SpotBugs kural paketi) bu arşivlerin içinde; `00-setup.sh` bunları `tools/`
+altına açıyor ve script'lerin hepsi oraya bakıyor. IntelliJ eklentileri
+`idea-plugins.tar.xz` **içinde** `.zip` olarak duruyor, çünkü *Install Plugin
+from Disk* bu biçimi bekliyor; kurulumdan sonra `tools/idea-plugins/` altındalar.
 
-`00-setup.sh` bunu otomatik çağırıyor. `zip` aracını tercih ederseniz:
+İki arşiv hâlâ bir git sunucusunun kabul edeceği 100 MB'ın üzerinde, bu yüzden
+numaralı bayt aralıkları olarak tutuluyorlar:
+
+```
+jdk/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.xz.part00   (90 MB)
+jdk/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.xz.part01   (79 MB)
+compile-time/pmd-dist-7.27.0-bin.tar.xz.part00                   (90 MB)
+compile-time/pmd-dist-7.27.0-bin.tar.xz.part01                   (33 MB)
+```
+
+Bunlar tek bir dosyanın düz `split -b` bayt aralıkları, dolayısıyla birleştirme
+sadece `cat` — ofset düzeltmesi de yok, yardımcı script de:
 
 ```bash
-zip -s 0 compile-time/pmd-dist-7.27.0-bin.zip --out /tmp/pmd-joined.zip
+cat compile-time/pmd-dist-7.27.0-bin.tar.xz.part* > /tmp/pmd.tar.xz
+tar -xJf /tmp/pmd.tar.xz
 ```
 
-Yeni araç arşivlerini aynı şekilde parçalamadan commit'lemeyin.
+`00-setup.sh` bunu sizin için yapıyor. (Eski düzen parçalı **zip** kullanıyordu;
+orada her merkezi dizin ofseti kendi parçasına göre yazıldığı için `cat`
+*"overlapped components"* veriyordu ve ofsetleri düzelten bir `zip-join.py`
+gerekiyordu. `.tar.xz`'e geçmek hem o yardımcıyı hem o hata biçimini ortadan
+kaldırdı.)
+
+Kendi araç arşivinizi eklemek için:
+
+```bash
+tar -C <acilmis-dizin> --owner=0 --group=0 --numeric-owner -cf - . | xz -T0 -6 > arac.tar.xz
+split -b 90M -d -a 2 arac.tar.xz arac.tar.xz.part && rm arac.tar.xz   # yalnizca >100 MB ise
+```
 
 ---
 
@@ -841,9 +863,8 @@ java-profiling-tools/
 │   ├── jfr-summary.sh       kaydı terminalde çöz
 │   ├── cpu-profile.sh       CPU flame graph
 │   ├── memory-profile.sh    allocation flame graph
-│   ├── static-scan.sh       SpotBugs + PMD + CPD
-│   └── zip-join.py          parçalı arşiv birleştirici
-├── jdk/                     JDK 21 arşivi (parçalı)
+│   └── static-scan.sh       SpotBugs + PMD + CPD
+├── jdk/                     JDK 21 arşivi (.tar.xz, parçalı)
 ├── runtime/                 async-profiler, JMC, MAT, VisualVM, GCViewer, jfr-converter
 ├── compile-time/            SpotBugs, PMD (parçalı), JaCoCo, JOL
 ├── plugins/
@@ -851,9 +872,10 @@ java-profiling-tools/
 │   └── idea/                IntelliJ IDEA için SpotBugs + PMD eklentileri
 ├── spotbugs-rule-packs/     sb-contrib + findsecbugs ve exclude filtresi
 ├── pmd-rulesets/            CLI ve IDE'nin paylaştığı PMD ruleset'i
-├── jmh/                     JMH jar'ları, bir çalıştırıcı ve örnek benchmark
+├── jmh/                     JMH jar'ları (arşivli), çalıştırıcı, örnek benchmark
 ├── docs/                    ekran görüntüleri ve nasıl üretildikleri
-├── tools/                   00-setup.sh üretiyor  (git'te yok)
+├── tools/                   00-setup.sh üretiyor  (git'te yok) — bütün jar'lar
+│                            ve IDEA eklenti zip'leri buraya açılıyor
 └── SHA256SUMS.txt           paketteki her arşivin sağlama toplamı
 ```
 
@@ -870,7 +892,7 @@ java-profiling-tools/
 | VisualVM açılıyor ama sekmeler yok | `tools/visualvm/bin/visualvm`'i doğrudan çalıştırdınız; cluster'dan haberi yok. `visualvm-open.sh` kullanın. |
 | async-profiler: *"Perf events unavailable"* | `perf_event_paranoid > 1`. Script'ler otomatik olarak `ctimer`'a düşüyor. |
 | Profil oturumu takılı görünüyor | `asprof stop <pid>` — asprof process'ini öldürmek agent'ı ayırmaz. |
-| `unzip: overlapped components` | Parçalı arşivi `cat` ile birleştirmişsiniz. `scripts/zip-join.py` kullanın. |
+| `JMH jars not found in …` / `JOL` boş | `tools/` dolu değil. Jar'lar `.tar.xz` içinde geliyor; `./scripts/00-setup.sh` çalıştırın. |
 | MAT dump açarken bellek yetmiyor | `tools/mat/MemoryAnalyzer.ini` içindeki `-Xmx`'i dump boyutunun en az yarısına çıkarın. |
 | Flame graph boş çıkıyor | Uygulama boştaydı ya da pencere çok kısaydı. Yük altında, `--duration 180` ile ölçün. |
 | Rapor hiç çağırmadığınız bir JDK metodunu suçluyor | Altındaki `your code:` satırına bakın — sizin paketinizdeki ilk frame odur. |
@@ -879,7 +901,8 @@ java-profiling-tools/
 
 ## İndirilenleri doğrulamak
 
-Paketteki her arşiv [`SHA256SUMS.txt`](SHA256SUMS.txt) içinde listeli:
+Paketteki her arşiv [`SHA256SUMS.txt`](SHA256SUMS.txt) içinde listeli —
+parçalı olanlar gerçekten commit'lenen parçalarıyla:
 
 ```bash
 sha256sum -c SHA256SUMS.txt

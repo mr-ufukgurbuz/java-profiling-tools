@@ -1,8 +1,11 @@
 # ---------------------------------------------------------------------------
-# CAREFUL: the bundled tool archives (*.zip, *.z01, *.tar.gz, *.tgz, *.jar,
-# *.nbm) ARE the point of this repository - they are what makes it work with
-# no internet. So the usual Java .gitignore, which ignores every archive, must
-# NOT be used here. Only build output and local state are ignored below.
+# CAREFUL: the bundled tool archives (*.tar.xz, *.tar.xz.partNN, *.tar.gz,
+# *.tgz, *.nbm) ARE the point of this repository - they are what makes it work
+# with no internet. So the usual Java .gitignore, which ignores every archive,
+# must NOT be used here. Only build output and local state are ignored below.
+#
+# Nothing is committed as *.zip or *.jar: some git hosts refuse those types
+# outright. Jars travel inside a .tar.xz and land in tools/ at setup.
 # ---------------------------------------------------------------------------
 
 # Unpacked tools: produced by scripts/00-setup.sh from the archives in this repo.
@@ -18,6 +21,11 @@ perf-out/
 target/
 build/
 out/
+
+# Loose jars/zips must never be committed - the host rejects them. If you are
+# repackaging a tool, archive it as .tar.xz instead (see README, Split archives).
+*.jar
+*.zip
 
 # JVM crash logs
 hs_err_pid*

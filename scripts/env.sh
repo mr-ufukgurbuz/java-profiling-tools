@@ -12,9 +12,12 @@ export _JAVA_OPTIONS_TMP="-Djava.io.tmpdir=$PERF_OUT/tmp"   # passed explicitly 
 export ASPROF="$TOOLS/async-profiler/bin/asprof"
 export JFRCLI="$TOOLS/jdk21/bin/jfr"
 export JAVA21="$TOOLS/jdk21/bin/java"
-export JOL="$_P/compile-time/jol-cli-0.17-full.jar"
-export GCVIEWER="$_P/runtime/gcviewer-1.37.jar"
-export JFRCONV="$_P/runtime/jfr-converter.jar"
+# These jars are committed inside .tar.xz archives (a git host that rejects
+# .jar uploads still has to be able to take this repository), so they live in
+# tools/ after 00-setup.sh has run - not next to their archive.
+export JOL="$TOOLS/jol/jol-cli-0.17-full.jar"
+export GCVIEWER="$TOOLS/gcviewer/gcviewer-1.37.jar"
+export JFRCONV="$TOOLS/jfr-converter/jfr-converter.jar"
 export PATH="$TOOLS/pmd/bin:$TOOLS/spotbugs/bin:$TOOLS/async-profiler/bin:$PATH"
 
 # For the GUI tools we alias the WRAPPER scripts, not the launchers themselves.

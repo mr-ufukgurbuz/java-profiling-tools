@@ -74,48 +74,25 @@ unzip_to() { # unzip_to <zip> <target-dir>
 }
 
 # ==================================================== JOINING SPLIT ARCHIVES
-# GitHub caps files at 100 MB, so the large archives are split with "zip -s":
-#   name.z01 name.z02 ... name.zip   (name.zip is the LAST part, it holds the
-#                                     central directory)
-join_split() { # join_split <name.zip> -> prints the path of the joined file
-  local last="$1" base="${1%.zip}" target
-  target="$TMP/$(basename "$base")-joined.zip"
+# Some archives are larger than the 100 MB a git host will take, so they are
+# committed as byte-range parts:  name.tar.xz.part00  name.tar.xz.part01 ...
+#
+# Because they are plain byte ranges of one file (split -b), rejoining them is
+# just 'cat'. That is the whole reason the archives are .tar.xz and not .zip:
+# a split zip has to have its central-directory offsets rewritten, which needed
+# a dedicated joiner script. This does not.
+cat_parts() { # cat_parts <name.tar.xz> -> prints the path to use
+  local base="$1" target
   local parts=() p
-  for p in "$base".z[0-9][0-9]; do [ -f "$p" ] && parts+=("$p"); done
-  if [ ${#parts[@]} -eq 0 ]; then echo "$last"; return 0; fi   # not split
-  [ -s "$target" ] && { echo "$target"; return 0; }
+  for p in "$base".part[0-9][0-9]; do [ -f "$p" ] && parts+=("$p"); done
+  if [ ${#parts[@]} -eq 0 ]; then echo "$base"; return 0; fi   # not split
 
+  target="$TMP/$(basename "$base")"
   # CAREFUL: this function's stdout is read by the caller AS A PATH.
   # Every progress/error message must go to stderr.
-  #
-  # Plain 'cat' is NOT enough: every central directory offset is written
-  # relative to its own part. Concatenating naively makes unzip say
-  # "overlapped components" and jar say "invalid LOC header". So we use a
-  # joiner that fixes the offsets too.
-  local joiner="$HERE/scripts/zip-join.py"
-  local py=""
-  for p in python3 python /usr/libexec/platform-python; do
-    command -v "$p" >/dev/null 2>&1 && { py="$p"; break; }
-    [ -x "$p" ] && { py="$p"; break; }
-  done
-
-  if [ -n "$py" ] && [ -f "$joiner" ]; then
-    "$py" "$joiner" "$last" "$target" >&2 || { rm -f "$target"; return 1; }
-  elif command -v zip >/dev/null 2>&1; then
-    info "joining split archive (zip -s 0): $(basename "$base")" >&2
-    zip -q -s 0 "$last" --out "$target" >&2 || { rm -f "$target"; return 1; }
-  else
-    err "cannot join the split archive: $(basename "$last")"
-    cat >&2 <<'HELP'
-   This archive was split into .z01 + .zip because of GitHub's 100 MB limit.
-   To join it you need ONE of:
-     - python3            (installed by default on RHEL 9)
-     - zip                (dnf install zip)
-   If you have neither, join it on a machine with internet and copy it over:
-     zip -s 0 pmd-dist-7.27.0-bin.zip --out pmd-joined.zip
-HELP
-    return 1
-  fi
+  [ -s "$target" ] && { echo "$target"; return 0; }
+  info "joining ${#parts[@]} parts -> $(basename "$base")" >&2
+  cat "${parts[@]}" > "$target" || { rm -f "$target"; return 1; }
   echo "$target"
 }
 
@@ -146,26 +123,19 @@ product_root() { # product_root <dir> [marker]
 unpack() { # unpack <archive> <target-dir-name> [marker]
   local archive="$1" target="$TOOLS/$2" marker="${3:-}"
   [ -d "$target" ] && { info "$2 already unpacked, skipping"; return 0; }
-  [ -f "$archive" ] || { warn "archive missing, skipping: $archive"; return 0; }
+  # A split archive exists only as its parts; the joined name is never on disk.
+  if [ ! -f "$archive" ] && ! compgen -G "$archive.part[0-9][0-9]" >/dev/null; then
+    warn "archive missing, skipping: $archive"; return 0
+  fi
 
   local stage="$TMP/stage-$2"; rm -rf "$stage"; mkdir -p "$stage"
   info "$(basename "$archive")  ->  tools/$2"
   case "$archive" in
+    *.tar.xz)
+      local joined; joined=$(cat_parts "$archive") || return 1
+      tar -xJf "$joined" -C "$stage" ;;
     *.tar.gz|*.tgz) tar -xzf "$archive" -C "$stage" ;;
     *.tar)          tar -xf  "$archive" -C "$stage" ;;
-    *.zip)
-      local joined; joined=$(join_split "$archive")
-      unzip_to "$joined" "$stage" || return 1
-      # There may be a tar nested inside (the JDK ships a plain .tar in a .zip)
-      # -type f matters: a zip can contain a DIRECTORY named "X.tar".
-      local inner; inner=$(find "$stage" -maxdepth 3 -type f -name '*.tar' -print 2>/dev/null | head -1)
-      if [ -n "$inner" ]; then
-        info "  unpacking inner archive: $(basename "$inner")" >&2
-        local stage2="$TMP/stage2-$2"; rm -rf "$stage2"; mkdir -p "$stage2"
-        tar -xf "$inner" -C "$stage2"
-        rm -rf "$stage"; stage="$stage2"
-      fi
-      ;;
     *) warn "unknown archive type: $archive"; return 0 ;;
   esac
 
@@ -187,22 +157,37 @@ unpack() { # unpack <archive> <target-dir-name> [marker]
 if [ "$VERIFY_ONLY" = "0" ]; then
   # 1) JDK 21 FIRST: it runs MAT/JMC and provides the 'jfr' CLI and 'jar'.
   #    It ships as a plain .tar inside a split zip.
-  JDKARC=$(find "$HERE/jdk" -maxdepth 1 -name 'OpenJDK21U-jdk_x64_linux_hotspot_*.tar.zip' 2>/dev/null | head -1)
+  # The JDK ships as a plain .tar, xz-compressed here and split into parts.
+  JDKARC=$(find "$HERE/jdk" -maxdepth 1 -name 'OpenJDK21U-jdk_x64_linux_hotspot_*.tar.xz.part00' 2>/dev/null | head -1)
+  JDKARC="${JDKARC%.part00}"
+  [ -n "$JDKARC" ] || JDKARC=$(find "$HERE/jdk" -maxdepth 1 -name 'OpenJDK21U-jdk_x64_linux_hotspot_*.tar.xz' 2>/dev/null | head -1)
   [ -n "$JDKARC" ] || JDKARC=$(find "$HERE/jdk" -maxdepth 1 -name 'OpenJDK21U-jdk_x64_linux_hotspot_*.tar.gz' 2>/dev/null | head -1)
   [ -n "$JDKARC" ] || { err "JDK 21 archive not found ($HERE/jdk)"; exit 1; }
   unpack "$JDKARC" jdk21 "release"
-  ZIP_METHOD=""   # from here on we can use the bundled JDK's jar
+  ZIP_METHOD=""   # from here on we can use the bundled JDK's jar for the .nbm files
 
   # A marker is only meaningful for files that sit IN the product root; asprof
   # lives under bin/ and visualvm.clusters under etc/, so those get no marker
   # (both archives have a single top-level directory, so descending is correct).
-  unpack "$HERE/runtime/async-profiler-4.5-linux-x64.tar.gz"                 async-profiler
-  unpack "$HERE/runtime/org.openjdk.jmc-9.1.2-linux.gtk.x86_64.tar.gz"       jmc            jmc.ini
-  unpack "$HERE/runtime/MemoryAnalyzer-1.17.0.20260601-linux.gtk.x86_64.zip" mat            MemoryAnalyzer.ini
-  unpack "$HERE/runtime/visualvm_221.zip"                                    visualvm
-  unpack "$HERE/compile-time/spotbugs-4.10.4.tgz"                            spotbugs
-  unpack "$HERE/compile-time/pmd-dist-7.27.0-bin.zip"                        pmd
-  unpack "$HERE/compile-time/jacoco-0.8.15.zip"                              jacoco
+  unpack "$HERE/runtime/async-profiler-4.5-linux-x64.tar.gz"                   async-profiler
+  unpack "$HERE/runtime/org.openjdk.jmc-9.1.2-linux.gtk.x86_64.tar.gz"         jmc            jmc.ini
+  unpack "$HERE/runtime/MemoryAnalyzer-1.17.0.20260601-linux.gtk.x86_64.tar.xz" mat           MemoryAnalyzer.ini
+  unpack "$HERE/runtime/visualvm_221.tar.xz"                                   visualvm
+  unpack "$HERE/compile-time/spotbugs-4.10.4.tgz"                              spotbugs
+  unpack "$HERE/compile-time/pmd-dist-7.27.0-bin.tar.xz"                       pmd
+  unpack "$HERE/compile-time/jacoco-0.8.15.tar.xz"                             jacoco
+
+  # Jars are not committed loose, so these unpack to where the scripts read them:
+  # env.sh exports $TOOLS paths, jmh-run.sh builds its classpath from tools/jmh-lib,
+  # and static-scan.sh loads every jar in tools/spotbugs-rule-packs.
+  unpack "$HERE/compile-time/jol-cli-0.17-full.tar.xz"                         jol
+  unpack "$HERE/runtime/gcviewer-1.37.tar.xz"                                  gcviewer
+  unpack "$HERE/runtime/jfr-converter.tar.xz"                                  jfr-converter
+  unpack "$HERE/jmh/lib/jmh-libs.tar.xz"                                       jmh-lib
+  unpack "$HERE/spotbugs-rule-packs/spotbugs-rule-packs.tar.xz"                spotbugs-rule-packs
+  # The IDEA plugins stay as .zip inside their archive: that is the form
+  # "Install Plugin from Disk" expects. After setup they are in tools/idea-plugins/.
+  unpack "$HERE/plugins/idea/idea-plugins.tar.xz"                              idea-plugins
 
   find "$TOOLS" -maxdepth 3 -name '*.sh' -exec chmod u+x {} \; 2>/dev/null || true
   for f in "$TOOLS/async-profiler/bin/"* "$TOOLS/pmd/bin/pmd" "$TOOLS/mat/MemoryAnalyzer" \
@@ -362,13 +347,31 @@ check "VisualVM launcher"  "$TOOLS/visualvm/bin/visualvm"     1
 check "SpotBugs"           "$TOOLS/spotbugs/bin/spotbugs"     1
 check "PMD"                "$TOOLS/pmd/bin/pmd"               1
 
-# The SpotBugs rule packs are NOT unpacked: static-scan.sh hands the jars to
-# SpotBugs with -pluginList, and in IntelliJ you add the same jars from disk.
-NPACKS=$(find "$HERE/spotbugs-rule-packs" -maxdepth 1 -name '*.jar' 2>/dev/null | wc -l)
-if [ "$NPACKS" -gt 0 ]; then
-  printf '  %s[ok     ]%s %-24s %s jar(s)\n' "$G" "$Z" "SpotBugs rule packs" "$NPACKS"
+# Jars are committed inside .tar.xz archives, so these live in tools/ after
+# setup. static-scan.sh hands the rule-pack jars to SpotBugs with -pluginList;
+# in IntelliJ you add the same files from disk.
+check "JOL"                "$TOOLS/jol/jol-cli-0.17-full.jar"
+check "GCViewer"           "$TOOLS/gcviewer/gcviewer-1.37.jar"
+check "jfr-converter"      "$TOOLS/jfr-converter/jfr-converter.jar"
+
+count_jars() { # count_jars <label> <dir> <what>
+  local label="$1" dir="$2" what="$3" n
+  n=$(find "$dir" -maxdepth 1 -name '*.jar' 2>/dev/null | wc -l)
+  if [ "$n" -gt 0 ]; then
+    printf '  %s[ok     ]%s %-24s %s %s\n' "$G" "$Z" "$label" "$n" "$what"
+  else
+    printf '  %s[MISSING]%s %-24s %s\n' "$R" "$Z" "$label" "$dir"
+    PROBLEMS=$((PROBLEMS+1))
+  fi
+}
+count_jars "SpotBugs rule packs" "$TOOLS/spotbugs-rule-packs" "jar(s)"
+count_jars "JMH libraries"       "$TOOLS/jmh-lib"             "jar(s)"
+
+NIDEA=$(find "$TOOLS/idea-plugins" -maxdepth 1 -name '*.zip' 2>/dev/null | wc -l)
+if [ "$NIDEA" -gt 0 ]; then
+  printf '  %s[ok     ]%s %-24s %s plugin(s), install from disk\n' "$G" "$Z" "IntelliJ IDEA plugins" "$NIDEA"
 else
-  printf '  %s[  -    ]%s %-24s none found in spotbugs-rule-packs/\n' "$Y" "$Z" "SpotBugs rule packs"
+  printf '  %s[  -    ]%s %-24s not unpacked\n' "$Y" "$Z" "IntelliJ IDEA plugins"
 fi
 
 # Did the -vm line actually land? This is where people get stuck most often.
@@ -428,4 +431,7 @@ Then:
   ./scripts/diagnose.sh <pid>    # full diagnosis in one command (terminal)
   ./scripts/jmc-open.sh          # JMC (opens correctly, with JDK 21)
   ./scripts/visualvm-open.sh     # VisualVM (plugins already installed)
+
+For IntelliJ IDEA, the two plugin zips are now in tools/idea-plugins/:
+  Settings -> Plugins -> gear -> Install Plugin from Disk...
 DONE

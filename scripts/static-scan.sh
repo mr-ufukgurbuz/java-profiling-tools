@@ -8,7 +8,7 @@
 #   --no-exclude          ignore the exclude filter, report everything
 #
 # Environment overrides:
-#   SPOTBUGS_RULE_PACKS   directory of rule-pack jars  (default: spotbugs-rule-packs/)
+#   SPOTBUGS_RULE_PACKS   directory of rule-pack jars  (default: tools/spotbugs-rule-packs/)
 #   SPOTBUGS_CATEGORIES   category list                (default: PERFORMANCE,CORRECTNESS,MT_CORRECTNESS)
 #   SPOTBUGS_EXCLUDE      exclude filter file; set empty to disable
 #   PMD_RULESET           PMD ruleset file; set empty for PMD's own categories
@@ -38,7 +38,7 @@ REPORT="$PERF_OUT/static-report"; mkdir -p "$REPORT"
 #   sb-contrib   - 319 extra patterns, 43 of them PERFORMANCE
 #   findsecbugs  - 144 patterns, ALL of them in the SECURITY category, which is
 #                  why they only show up with --security
-PACKS="${SPOTBUGS_RULE_PACKS:-$PROFILING_HOME/spotbugs-rule-packs}"
+PACKS="${SPOTBUGS_RULE_PACKS:-$TOOLS/spotbugs-rule-packs}"
 
 # Without a filter, EI_EXPOSE_REP alone can account for most of the report.
 # See spotbugs-rule-packs/spotbugs-exclude.xml for what is filtered and why.

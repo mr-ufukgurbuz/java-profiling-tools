@@ -6,15 +6,19 @@ The bundled SpotBugs 4.10.4 ships 518 bug patterns across 196 detectors. These
 two jars add 463 more. They are not IntelliJ plugins and `00-setup.sh` does not
 unpack them — they are plain SpotBugs *plugin jars*, loaded two ways:
 
+The jars are committed here as `spotbugs-rule-packs.tar.xz`, not loose — some
+git hosts reject `.jar` uploads outright. `00-setup.sh` unpacks them to
+`tools/spotbugs-rule-packs/`, which is where both consumers look:
+
 - **From the command line** — [`scripts/static-scan.sh`](../scripts/static-scan.sh)
-  finds every `.jar` in this directory and passes it to SpotBugs with
-  `-pluginList`. Nothing to configure.
+  finds every `.jar` in `tools/spotbugs-rule-packs/` and passes it to SpotBugs
+  with `-pluginList`. Nothing to configure.
 - **From IntelliJ IDEA** — `Settings → Tools → SpotBugs → Plugins → +`, then
-  pick these jars from disk. See [`plugins/idea/`](../plugins/idea/).
+  pick those jars from disk. See [`plugins/idea/`](../plugins/idea/).
 
 ## What is in here
 
-| Jar | Plugin id | Patterns | Detectors |
+| Jar (in `tools/spotbugs-rule-packs/` after setup) | Plugin id | Patterns | Detectors |
 |---|---|---|---|
 | `sb-contrib-7.6.9.jar` | `com.mebigfatguy.fbcontrib` | 319 | 153 |
 | `findsecbugs-plugin-1.14.0.jar` | `com.h3xstream.findsecbugs` | 144 | 121 |
@@ -83,8 +87,10 @@ worth ten minutes if you are going to run this in CI.
 
 ## Adding more packs
 
-Drop the jar in this directory. `static-scan.sh` picks up every `.jar` here, and
-`00-setup.sh --verify` counts them.
+Add the jar to `spotbugs-rule-packs.tar.xz` (or drop it straight into
+`tools/spotbugs-rule-packs/` for a one-off). `static-scan.sh` picks up every
+`.jar` in that directory, and `00-setup.sh --verify` counts them. Do not commit
+a loose `.jar` — see the repository README on archives.
 
 One rule: **SpotBugs refuses to load two plugins with the same plugin id.** The
 ids are in the table above. Renaming a second copy of sb-contrib does not help —
@@ -98,7 +104,7 @@ same way `static-scan.sh` does:
 
 ```bash
 spotbugs -textui -effort:max -low \
-    -pluginList spotbugs-rule-packs/sb-contrib-7.6.9.jar:spotbugs-rule-packs/findsecbugs-plugin-1.14.0.jar \
+    -pluginList tools/spotbugs-rule-packs/sb-contrib-7.6.9.jar:tools/spotbugs-rule-packs/findsecbugs-plugin-1.14.0.jar \
     -exclude spotbugs-rule-packs/spotbugs-exclude.xml \
     -auxclasspath "$(cat compile.classpath)" \
     -xml:withMessages -output build/reports/spotbugs.xml \
@@ -118,7 +124,7 @@ coordinates it would have to download:
         <failOnError>true</failOnError>
         <excludeFilterFile>spotbugs-rule-packs/spotbugs-exclude.xml</excludeFilterFile>
         <pluginList>
-            spotbugs-rule-packs/sb-contrib-7.6.9.jar,spotbugs-rule-packs/findsecbugs-plugin-1.14.0.jar
+            tools/spotbugs-rule-packs/sb-contrib-7.6.9.jar,tools/spotbugs-rule-packs/findsecbugs-plugin-1.14.0.jar
         </pluginList>
     </configuration>
 </plugin>

@@ -11,7 +11,10 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/../scripts/env.sh" >/dev/null
 SRC="${1:?usage: $0 <Benchmark.java> [extra-classpath]}"; EXTRA="${2:-}"
-LIB="$HERE/lib"
+# The JMH jars are committed as jmh/lib/jmh-libs.tar.xz and unpacked here by
+# 00-setup.sh; $LIB is overridable for a checkout that keeps them elsewhere.
+LIB="${JMH_LIB:-$TOOLS/jmh-lib}"
+[ -d "$LIB" ] || { echo "JMH jars not found in $LIB - run ./scripts/00-setup.sh first" >&2; exit 1; }
 CP="$LIB/jmh-core-1.37.jar:$LIB/jopt-simple-5.0.4.jar:$LIB/commons-math3-3.6.1.jar"
 [ -n "$EXTRA" ] && CP="$CP:$EXTRA"
 OUT="$PERF_OUT/jmh"; rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/gen" "$OUT/tmp"

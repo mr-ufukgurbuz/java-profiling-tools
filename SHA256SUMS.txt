@@ -1,23 +1,19 @@
 # SHA-256 checksums for every bundled archive.
 # Verify with:  sha256sum -c SHA256SUMS.txt
 #
-# NOTE: the split archives (*.z01 + *.zip) are listed as the parts that are
-#       actually committed, not as the joined file. scripts/00-setup.sh joins
-#       them with scripts/zip-join.py before unpacking.
+# NOTE: the split archives are listed as the parts that are actually committed
+#       (*.tar.xz.part00, *.part01, ...), not as the joined file. They are plain
+#       byte ranges, so scripts/00-setup.sh rejoins them with 'cat'.
 
-5b3f6ddb724e761d25c937d68b0189a3a23f3e220e3282575ee0b53359e8110e  compile-time/jacoco-0.8.15.zip
-ea8cf31b7dc6c18810ca7aeadcbe7a2b352fb250261b8060ce513e8a99ebcd12  compile-time/jol-cli-0.17-full.jar
-0c1ed7449f3b04d7387276c4db2bcdfda931844d2e3ddb81f1959a3202b3f6df  compile-time/pmd-dist-7.27.0-bin.z01
-42448aa2a3f218470cb4a2ec4ec5baa7b74f89c18033b2eab179a565038118dd  compile-time/pmd-dist-7.27.0-bin.zip
+85292516dc97914419cfdcfbcbbbb6a49269750545d0dc340e0a12768bba20ad  compile-time/jacoco-0.8.15.tar.xz
+04841656ff8ee49abc66bd3a578b4dd5d1becb98ab2687207555d277bdabd85a  compile-time/jol-cli-0.17-full.tar.xz
+8c03d54dfab8d3ed4dd22fc1433db2ee0957bd565f2be0cd52a0b83cc252af6d  compile-time/pmd-dist-7.27.0-bin.tar.xz.part00
+86fa404c4d1c4e0673da394cc991944ed0c66f5ede3154beae59866aae236487  compile-time/pmd-dist-7.27.0-bin.tar.xz.part01
 72bc0d4edd686e462c0f71f42a049b27bf4da6708797ff7b2b56dd202714b4e5  compile-time/spotbugs-4.10.4.tgz
-d5d807541d23ea0180a645ab0f1337e05ec9dcddd0726b1c6f2a8acf99db779b  jdk/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.z01
-5a468f0b5e8b02393a246c48c817088bfe1d9fdd1f2105c8cef510a2f61cdff4  jdk/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.zip
-1e56d7b058d28b65abd256b8458e3885b674c1d588fa43cd7d1cbb9c7ef2b308  jmh/lib/commons-math3-3.6.1.jar
-dc0eaf2bbf0036a70b60798c785d6e03a9daf06b68b8edb0f1ba9eb3421baeb3  jmh/lib/jmh-core-1.37.jar
-6a5604b5b804e0daca1145df1077609321687734a8b49387e49f10557c186c77  jmh/lib/jmh-generator-annprocess-1.37.jar
-df26cc58f235f477db07f753ba5a3ab243ebe5789d9f89ecf68dd62ea9a66c28  jmh/lib/jopt-simple-5.0.4.jar
-33525688a44c08f676367fd821b2b1bc29f11eb8048cba365519222c978ee70c  plugins/idea/PMDPlugin-2.1.0.zip
-e6aab232a13b6844f488daa5106d1dbfe3ff2b24fa4e792a18bd4d486f704f6e  plugins/idea/spotbugs-idea-1.2.8.zip
+7347980cc0bcc1a7a1ae3906874dd4c57fb2c2c2531dd2bedfde590987f680e4  jdk/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.xz.part00
+a5241ef5b008fde6c0835c681475763cec4db36c45d0800152e96dc9dfc89718  jdk/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.xz.part01
+dda4dccfa6068d43b8a22bccaf227d2b98a71de936ccbd2768fe4fdc8c97daf6  jmh/lib/jmh-libs.tar.xz
+9da403f1811e901bc319b5d602a8d39b278c8d6919a5be637f15b69693691e7a  plugins/idea/idea-plugins.tar.xz
 40ab4769979440fa8a0248224dd7dead7c3643fbb5a8db601de64fb5e3f3e6a9  plugins/visualvm/jsyntaxpane-lib.nbm
 50aa92bc69f51f0cf7673b1e8dd5b70fb34508eedfdcb4e8ffbac0969d8dfaf6  plugins/visualvm/org-graalvm-visualvm-modules-buffermonitor.nbm
 7c74d748dd907dd48dc281c185f7722a2b9f539349c1cd64cc0e578774bea931  plugins/visualvm/org-graalvm-visualvm-modules-extensions.nbm
@@ -39,11 +35,10 @@ f2d270460766e68d023bbd8952ecebf4aec7962ff4dfdc32bc0013b4b71c4d07  plugins/visual
 90d3b94165b7a5d662f640b2378cf9fccf5fc975bb5df2faac93089d085bc6eb  plugins/visualvm/org-openjdk-btrace-visualvm-api.nbm
 a6b28e1c3303928f20173ff4ca81c249aa5b8304fc9e7b2f6cd503cbb8800bad  plugins/visualvm/org-openjdk-btrace-visualvm-tracer-deployer.nbm
 bd7d9069a0c6835574ada276553c8a358190009356fd7e59a8bafa2302ab91d0  plugins/visualvm/org-openjdk-btrace-visualvm.nbm
-e1ea80a7984d411e4c4d7dfbab092da9255f7b772d681a256a61049bcc883767  runtime/MemoryAnalyzer-1.17.0.20260601-linux.gtk.x86_64.zip
+6e25bddfe7b391f5b2a068c03d9c38a5116f9b78ffb37c915de127c489bb3816  runtime/MemoryAnalyzer-1.17.0.20260601-linux.gtk.x86_64.tar.xz
 89546fbb9ee0fc5496c7edd4099b0709489bc78b0d8057ccbb4b801f6b032b62  runtime/async-profiler-4.5-linux-x64.tar.gz
-325a5f1a8f67588b6845c71eceb70c8b74c45930fd553ba2fc7b3b4118608e13  runtime/gcviewer-1.37.jar
-41a3b07cd73a8f800814856a622449530f645662d5b274fbd040f1a82b032aee  runtime/jfr-converter.jar
+ad27114aff2beca2c8f6a9270110efe4008e50703ae0b9e8f542b163aaecc1ff  runtime/gcviewer-1.37.tar.xz
+ddfcb425e9787ccf67c6403a44883e7d2d7c7e11bedeae0bd80d6e2c888dd8a7  runtime/jfr-converter.tar.xz
 3085244b8f32bbd0646c8109a9f65f7089497e07e1d6bbc62f64da942d27d748  runtime/org.openjdk.jmc-9.1.2-linux.gtk.x86_64.tar.gz
-6884c908c9e10a959dea8e7b168b496515c0310d6b86a35ce96b8197231f4ef3  runtime/visualvm_221.zip
-6fa340344fa433ff46c2985dab1010e8bc739f9395c983594a5240095e92abc8  spotbugs-rule-packs/findsecbugs-plugin-1.14.0.jar
-9203f1af681600039a316f2fa6ca9d8ce52bbe3b4253aaf7321a3dfae914ab2b  spotbugs-rule-packs/sb-contrib-7.6.9.jar
+d89d846ac1b9f9d35babd1a39862e65e762d00edbfb1b6d1f7c59192b93b11fe  runtime/visualvm_221.tar.xz
+f37970365dae9256a25f3a7b00cd5986a2bc0a7b372ed3abf1939a542697c31a  spotbugs-rule-packs/spotbugs-rule-packs.tar.xz
